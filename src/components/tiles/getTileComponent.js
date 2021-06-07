@@ -1,4 +1,5 @@
 import { Empty } from "./Empty";
+import { HouseEntrance } from "./HouseEntrance";
 import { Pellet } from "./Pellet";
 import { PowerPellet } from "./PowerPellet";
 import {
@@ -29,6 +30,12 @@ import {
   WallExternalStraightRight,
   WallExternalStraightTop,
 } from "./walls/WallExternalStraight";
+import {
+  WallHouseCornerBL,
+  WallHouseCornerBR,
+  WallHouseCornerTL,
+  WallHouseCornerTR,
+} from "./walls/WallHouseCorner";
 import {
   WallInternalCornerBL,
   WallInternalCornerBR,
@@ -93,6 +100,14 @@ export const getTileComponent = (tileType, display) => {
         all: WallInternalFilled,
       },
     },
+    house: {
+      corner: {
+        tl: WallHouseCornerTL,
+        tr: WallHouseCornerTR,
+        br: WallHouseCornerBR,
+        bl: WallHouseCornerBL,
+      },
+    },
   };
 
   if (tileType === "pellet") {
@@ -108,7 +123,11 @@ export const getTileComponent = (tileType, display) => {
     return mapWallToComponent[wallType][variant][orientation];
   }
 
-  if (tileType === "empty") {
+  if (tileType === "empty" || tileType === "tunnel") {
     return Empty;
+  }
+
+  if (tileType === "houseEntrance") {
+    return HouseEntrance;
   }
 };

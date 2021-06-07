@@ -20,15 +20,14 @@ const WallExternalInternalRight = (props) => {
 
 const WallExternalInternalLeft = (props) => {
   const { rotation, tileSize, position, color } = props;
-  console.log(tileSize);
   return (
     <g
-      transform={`translate(${position.x + tileSize}, ${
+      transform={`translate(${position.x}, ${
         position.y
-      }), rotate(${rotation}, ${tileSize / 2}, ${tileSize / 2}), scale(-1, 1)`}
+      }), rotate(${rotation}, ${tileSize / 2}, ${tileSize / 2})`}
     >
       <path
-        d="M 0,0 H 8 M0, 4 a4,4 0 0 1 4,4"
+        d="M 0,0 H 8 M8, 4 a4,4 0 0 0 -4,4"
         fill="transparent"
         stroke={color}
       />

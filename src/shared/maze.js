@@ -399,4 +399,705 @@ export const maze1 = [
       orientation: "right",
     }),
   ]),
+
+  // row 10
+  createRowFromHalf([
+    ...createNTiles(5, "wall", {
+      wallType: "internal",
+      variant: "filled",
+      orientation: "all",
+    }),
+    ...createNTiles(1, "wall", {
+      wallType: "external",
+      variant: "straight",
+      orientation: "left",
+    }),
+    ...createNTiles(1, "pellet"),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "straight",
+      orientation: "left",
+    }),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "corner",
+      orientation: "tl",
+    }),
+    ...createNTiles(2, "wall", {
+      wallType: "internal",
+      variant: "straight",
+      orientation: "top",
+    }),
+
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "corner",
+      orientation: "br",
+    }),
+    ...createNTiles(1, "empty"),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "corner",
+      orientation: "bl",
+    }),
+  ]),
+
+  // row 11
+  createRowFromHalf([
+    ...createNTiles(5, "wall", {
+      wallType: "internal",
+      variant: "filled",
+      orientation: "all",
+    }),
+    ...createNTiles(1, "wall", {
+      wallType: "external",
+      variant: "straight",
+      orientation: "left",
+    }),
+    ...createNTiles(1, "pellet"),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "straight",
+      orientation: "left",
+    }),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "straight",
+      orientation: "right",
+    }),
+    ...createNTiles(5, "empty"),
+  ]),
+
+  // row 12
+  createRowFromHalf([
+    ...createNTiles(5, "wall", {
+      wallType: "internal",
+      variant: "filled",
+      orientation: "all",
+    }),
+    ...createNTiles(1, "wall", {
+      wallType: "external",
+      variant: "straight",
+      orientation: "left",
+    }),
+    ...createNTiles(1, "pellet"),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "straight",
+      orientation: "left",
+    }),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "straight",
+      orientation: "right",
+    }),
+    ...createNTiles(1, "empty"),
+    ...createNTiles(1, "wall", {
+      wallType: "house",
+      variant: "corner",
+      orientation: "tl",
+    }),
+    ...createNTiles(2, "wall", {
+      wallType: "external",
+      variant: "straight",
+      orientation: "bottom",
+    }),
+    ...createNTiles(1, "houseEntrance"),
+  ]),
+
+  // row 13
+  createRowFromHalf([
+    ...createNTiles(5, "wall", {
+      wallType: "external",
+      variant: "straight",
+      orientation: "top",
+    }),
+    ...createNTiles(1, "wall", {
+      wallType: "external",
+      variant: "smallCorner",
+      orientation: "br",
+    }),
+    ...createNTiles(1, "pellet"),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "corner",
+      orientation: "bl",
+    }),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "corner",
+      orientation: "br",
+    }),
+    ...createNTiles(1, "empty"),
+    ...createNTiles(1, "wall", {
+      wallType: "external",
+      variant: "straight",
+      orientation: "right",
+    }),
+    ...createNTiles(3, "empty"),
+  ]),
+
+  // 14
+  createRowFromHalf([
+    ...createNTiles(6, "tunnel"),
+    ...createNTiles(1, "pellet"),
+    ...createNTiles(3, "empty"),
+    ...createNTiles(1, "wall", {
+      wallType: "external",
+      variant: "straight",
+      orientation: "right",
+    }),
+    ...createNTiles(3, "empty"),
+  ]),
+
+  //15
+  createRowFromHalf([
+    ...createNTiles(5, "wall", {
+      wallType: "external",
+      variant: "straight",
+      orientation: "bottom",
+    }),
+    ...createNTiles(1, "wall", {
+      wallType: "external",
+      variant: "smallCorner",
+      orientation: "tr",
+    }),
+    ...createNTiles(1, "pellet"),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "corner",
+      orientation: "tl",
+    }),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "corner",
+      orientation: "tr",
+    }),
+    ...createNTiles(1, "empty"),
+    ...createNTiles(1, "wall", {
+      wallType: "external",
+      variant: "straight",
+      orientation: "right",
+    }),
+    ...createNTiles(3, "empty"),
+  ]),
+
+  // 16
+  createRowFromHalf([
+    ...createNTiles(5, "wall", {
+      wallType: "internal",
+      variant: "filled",
+      orientation: "all",
+    }),
+    ...createNTiles(1, "wall", {
+      wallType: "external",
+      variant: "straight",
+      orientation: "left",
+    }),
+    ...createNTiles(1, "pellet"),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "straight",
+      orientation: "left",
+    }),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "straight",
+      orientation: "right",
+    }),
+    ...createNTiles(1, "empty"),
+    ...createNTiles(1, "wall", {
+      wallType: "house",
+      variant: "corner",
+      orientation: "bl",
+    }),
+    ...createNTiles(3, "wall", {
+      wallType: "external",
+      variant: "straight",
+      orientation: "top",
+    }),
+  ]),
+
+  // 17
+  createRowFromHalf([
+    ...createNTiles(5, "wall", {
+      wallType: "internal",
+      variant: "filled",
+      orientation: "all",
+    }),
+    ...createNTiles(1, "wall", {
+      wallType: "external",
+      variant: "straight",
+      orientation: "left",
+    }),
+    ...createNTiles(1, "pellet"),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "straight",
+      orientation: "left",
+    }),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "straight",
+      orientation: "right",
+    }),
+    ...createNTiles(5, "empty"),
+  ]),
+
+  // 18
+  createRowFromHalf([
+    ...createNTiles(5, "wall", {
+      wallType: "internal",
+      variant: "filled",
+      orientation: "all",
+    }),
+    ...createNTiles(1, "wall", {
+      wallType: "external",
+      variant: "straight",
+      orientation: "left",
+    }),
+    ...createNTiles(1, "pellet"),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "straight",
+      orientation: "left",
+    }),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "straight",
+      orientation: "right",
+    }),
+    ...createNTiles(1, "empty"),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "corner",
+      orientation: "tl",
+    }),
+    ...createNTiles(3, "wall", {
+      wallType: "internal",
+      variant: "straight",
+      orientation: "top",
+    }),
+  ]),
+
+  // 19
+  createRowFromHalf([
+    ...createNTiles(1, "wall", {
+      wallType: "external",
+      variant: "corner",
+      orientation: "tl",
+    }),
+    ...createNTiles(4, "wall", {
+      wallType: "external",
+      variant: "straight",
+      orientation: "top",
+    }),
+    ...createNTiles(1, "wall", {
+      wallType: "external",
+      variant: "smallCorner",
+      orientation: "br",
+    }),
+    ...createNTiles(1, "pellet"),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "corner",
+      orientation: "bl",
+    }),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "corner",
+      orientation: "br",
+    }),
+    ...createNTiles(1, "empty"),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "corner",
+      orientation: "bl",
+    }),
+    ...createNTiles(2, "wall", {
+      wallType: "internal",
+      variant: "straight",
+      orientation: "bottom",
+    }),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "corner",
+      orientation: "tr",
+    }),
+  ]),
+
+  // 20
+  createRowFromHalf([
+    ...createNTiles(1, "wall", {
+      wallType: "external",
+      variant: "straight",
+      orientation: "left",
+    }),
+    ...createNTiles(12, "pellet"),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "straight",
+      orientation: "right",
+    }),
+  ]),
+
+  // 21
+  createRowFromHalf([
+    ...createNTiles(1, "wall", {
+      wallType: "external",
+      variant: "straight",
+      orientation: "left",
+    }),
+    ...createNTiles(1, "pellet"),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "corner",
+      orientation: "tl",
+    }),
+    ...createNTiles(2, "wall", {
+      wallType: "internal",
+      variant: "straight",
+      orientation: "top",
+    }),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "corner",
+      orientation: "tr",
+    }),
+    ...createNTiles(1, "pellet"),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "corner",
+      orientation: "tl",
+    }),
+    ...createNTiles(3, "wall", {
+      wallType: "internal",
+      variant: "straight",
+      orientation: "top",
+    }),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "corner",
+      orientation: "tr",
+    }),
+    ...createNTiles(1, "pellet"),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "straight",
+      orientation: "right",
+    }),
+  ]),
+
+  // 22
+  createRowFromHalf([
+    ...createNTiles(1, "wall", {
+      wallType: "external",
+      variant: "straight",
+      orientation: "left",
+    }),
+    ...createNTiles(1, "pellet"),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "corner",
+      orientation: "bl",
+    }),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "straight",
+      orientation: "bottom",
+    }),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "corner",
+      orientation: "tr",
+    }),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "straight",
+      orientation: "left",
+    }),
+    ...createNTiles(1, "pellet"),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "corner",
+      orientation: "bl",
+    }),
+    ...createNTiles(3, "wall", {
+      wallType: "internal",
+      variant: "straight",
+      orientation: "bottom",
+    }),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "corner",
+      orientation: "br",
+    }),
+    ...createNTiles(1, "pellet"),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "corner",
+      orientation: "bl",
+    }),
+  ]),
+
+  //23
+  createRowFromHalf([
+    ...createNTiles(1, "wall", {
+      wallType: "external",
+      variant: "straight",
+      orientation: "left",
+    }),
+    ...createNTiles(1, "powerPellet"),
+    ...createNTiles(2, "pellet"),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "straight",
+      orientation: "right",
+    }),
+
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "straight",
+      orientation: "left",
+    }),
+    ...createNTiles(7, "pellet"),
+    ...createNTiles(1, "empty"),
+  ]),
+
+  // 24
+  createRowFromHalf([
+    ...createNTiles(1, "wall", {
+      wallType: "external",
+      variant: "internal",
+      orientation: "ll",
+    }),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "straight",
+      orientation: "bottom",
+    }),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "corner",
+      orientation: "tr",
+    }),
+    ...createNTiles(1, "pellet"),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "straight",
+      orientation: "left",
+    }),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "straight",
+      orientation: "right",
+    }),
+    ...createNTiles(1, "pellet"),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "corner",
+      orientation: "tl",
+    }),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "corner",
+      orientation: "tr",
+    }),
+    ...createNTiles(1, "pellet"),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "corner",
+      orientation: "tl",
+    }),
+    ...createNTiles(3, "wall", {
+      wallType: "internal",
+      variant: "straight",
+      orientation: "top",
+    }),
+  ]),
+
+  //25
+  createRowFromHalf([
+    ...createNTiles(1, "wall", {
+      wallType: "external",
+      variant: "internal",
+      orientation: "lr",
+    }),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "straight",
+      orientation: "top",
+    }),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "corner",
+      orientation: "br",
+    }),
+    ...createNTiles(1, "pellet"),
+
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "corner",
+      orientation: "bl",
+    }),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "corner",
+      orientation: "br",
+    }),
+    ...createNTiles(1, "pellet"),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "straight",
+      orientation: "right",
+    }),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "straight",
+      orientation: "left",
+    }),
+    ...createNTiles(1, "pellet"),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "corner",
+      orientation: "bl",
+    }),
+    ...createNTiles(2, "wall", {
+      wallType: "internal",
+      variant: "straight",
+      orientation: "bottom",
+    }),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "corner",
+      orientation: "tr",
+    }),
+  ]),
+
+  //26
+  createRowFromHalf([
+    ...createNTiles(1, "wall", {
+      wallType: "external",
+      variant: "straight",
+      orientation: "left",
+    }),
+    ...createNTiles(6, "pellet"),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "straight",
+      orientation: "right",
+    }),
+
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "straight",
+      orientation: "left",
+    }),
+    ...createNTiles(4, "pellet"),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "straight",
+      orientation: "right",
+    }),
+  ]),
+
+  //27
+  createRowFromHalf([
+    ...createNTiles(1, "wall", {
+      wallType: "external",
+      variant: "straight",
+      orientation: "left",
+    }),
+    ...createNTiles(1, "pellet"),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "corner",
+      orientation: "tl",
+    }),
+    ...createNTiles(4, "wall", {
+      wallType: "internal",
+      variant: "straight",
+      orientation: "top",
+    }),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "corner",
+      orientation: "br",
+    }),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "corner",
+      orientation: "bl",
+    }),
+    ...createNTiles(2, "wall", {
+      wallType: "internal",
+      variant: "straight",
+      orientation: "top",
+    }),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "corner",
+      orientation: "tr",
+    }),
+    ...createNTiles(1, "pellet"),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "straight",
+      orientation: "right",
+    }),
+  ]),
+  //28
+  createRowFromHalf([
+    ...createNTiles(1, "wall", {
+      wallType: "external",
+      variant: "straight",
+      orientation: "left",
+    }),
+    ...createNTiles(1, "pellet"),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "corner",
+      orientation: "bl",
+    }),
+    ...createNTiles(8, "wall", {
+      wallType: "internal",
+      variant: "straight",
+      orientation: "bottom",
+    }),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "corner",
+      orientation: "br",
+    }),
+    ...createNTiles(1, "pellet"),
+    ...createNTiles(1, "wall", {
+      wallType: "internal",
+      variant: "corner",
+      orientation: "bl",
+    }),
+  ]),
+
+  // 29
+  createRowFromHalf([
+    ...createNTiles(1, "wall", {
+      wallType: "external",
+      variant: "straight",
+      orientation: "left",
+    }),
+    ...createNTiles(13, "pellet"),
+  ]),
+
+  // 31
+  createRowFromHalf([
+    ...createNTiles(1, "wall", {
+      wallType: "external",
+      variant: "corner",
+      orientation: "bl",
+    }),
+    ...createNTiles(13, "wall", {
+      wallType: "external",
+      variant: "straight",
+      orientation: "bottom",
+    }),
+  ]),
 ];
