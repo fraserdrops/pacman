@@ -1,44 +1,13 @@
 import { createMachine, spawn, assign, send, actions } from "xstate";
 import PacmanMachine from "./PacmanMachine";
 import GhostMachine from "./GhostMachine";
+import { maze1, getTileType, setTileType } from "../shared/maze";
 
 const { pure } = actions;
-const GHOST_HOUSE_ROW = 5;
-const GHOST_HOUSE_LEFT_COL = 5;
-const GHOST_HOUSE_MIDDLE_COL = 5;
-const GHOST_HOUSE_RIGHT_COL = 5;
-
-const generateMaze = () => {
-  const NUM_ROWS = 10;
-  const NUM_COLS = 10;
-  const maze = [];
-  let pelletsRemaining = 0;
-  for (let i = 0; i < NUM_ROWS; i++) {
-    for (let j = 0; j < NUM_COLS; j++) {
-      if (!maze[i]) {
-        maze[i] = [];
-      }
-      if (i === 0 || i === NUM_ROWS - 1 || j === 0 || j === NUM_COLS - 1) {
-        maze[i][j] = "wall";
-      } else if (i === 1) {
-        maze[i][j] = "pellet";
-        pelletsRemaining++;
-      } else {
-        maze[i][j] = "powerPellet";
-        pelletsRemaining++;
-      }
-    }
-  }
-  return { maze, pelletsRemaining };
-};
-
-const getTileType = (maze, position) => {
-  return maze[position.row][position.col];
-};
-
-const setTileType = (maze, position, type) => {
-  maze[position.row][position.col] = type;
-};
+const GHOST_HOUSE_ROW = 10;
+const GHOST_HOUSE_LEFT_COL = 10;
+const GHOST_HOUSE_MIDDLE_COL = 11;
+const GHOST_HOUSE_RIGHT_COL = 12;
 
 const createGameStateForCharacters = (ctx) => {
   const gameState = {
@@ -55,22 +24,21 @@ const createGameStateForCharacters = (ctx) => {
       position: ctx.ghosts[ghostName].position,
     };
   });
-  console.log(gameState, ctx);
   return gameState;
 };
 
 const characterStartPositions = {
   pacman: {
-    row: 7,
-    col: 7,
+    row: 3,
+    col: 3,
     rowOffset: 4,
-    colOffset: 4,
+    colOffset: 3,
   },
   inky: {
     row: GHOST_HOUSE_ROW,
     col: GHOST_HOUSE_LEFT_COL,
     rowOffset: 4,
-    colOffset: 4,
+    colOffset: 3,
   },
   pinky: {
     row: GHOST_HOUSE_ROW - 1,
@@ -88,7 +56,7 @@ const characterStartPositions = {
     row: GHOST_HOUSE_ROW - 1,
     col: GHOST_HOUSE_MIDDLE_COL,
     rowOffset: 4,
-    colOffset: 4,
+    colOffset: 3,
   },
 };
 
@@ -100,7 +68,7 @@ const parent = createMachine(
         ref: undefined,
       },
       ghosts: {},
-      ...generateMaze(),
+      maze: maze1,
       waitingForResponse: [],
       gameConfig: {
         frightenedModeDuration: 10,
@@ -117,10 +85,6 @@ const parent = createMachine(
                   ...PacmanMachine.context,
                   maze: ctx.maze,
                   position: characterStartPositions.pacman,
-                  targetTile: {
-                    row: 1,
-                    col: 2,
-                  },
                 }),
                 "pacman"
               ),
@@ -189,9 +153,9 @@ const parent = createMachine(
             }),
           }),
         ],
-        // always: {
-        //   target: "inGame",
-        // },
+        always: {
+          target: "inGame",
+        },
         on: {
           START_GAME: {
             target: "inGame",
@@ -358,7 +322,7 @@ const parent = createMachine(
                   src: () => (callback) => {
                     const interval = setInterval(() => {
                       callback("TICK");
-                    }, 2000);
+                    }, 100);
 
                     return () => {
                       clearInterval(interval);
@@ -506,8 +470,7 @@ const parent = createMachine(
         waitingForResponse: (ctx, event) =>
           ctx.waitingForResponse.filter((item) => item !== event.character),
       }),
-      updatePosition: assign((ctx, event, yoza) => {
-        console.log("sftate", yoza);
+      updatePosition: assign((ctx, event) => {
         if (event.character === "pacman") {
           return {
             ...ctx,
@@ -515,6 +478,7 @@ const parent = createMachine(
               ...ctx.pacman,
               position: event.position,
               direction: event.direction,
+              requestedDirection: event.requestedDirection,
             },
           };
         } else {
@@ -534,8 +498,8 @@ const parent = createMachine(
       setTileToEmpty: assign({
         maze: (ctx) => {
           const { pacman, maze } = ctx;
-          const updatedMaze = [...maze];
-          setTileType(updatedMaze, pacman.position, "empty");
+          const updatedMaze = { ...maze };
+          setTileType(updatedMaze.tiles, pacman.position, "empty");
           return updatedMaze;
         },
       }),
@@ -596,13 +560,13 @@ const parent = createMachine(
       pacmanIsEatingPellet: (ctx) => {
         const { pacman, maze } = ctx;
         const { position } = pacman;
-        const tileType = getTileType(maze, position);
+        const tileType = getTileType(maze.tiles, position);
         return tileType === "pellet";
       },
       pacmanIsEatingPowerPellet: (ctx) => {
         const { pacman, maze } = ctx;
         const { position } = pacman;
-        const tileType = getTileType(maze, position);
+        const tileType = getTileType(maze.tiles, position);
         return tileType === "powerPellet";
       },
       eatenAllPellets: (ctx) => ctx.pelletsRemaining === 0,

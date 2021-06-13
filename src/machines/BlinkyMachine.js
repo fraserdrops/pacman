@@ -1,4 +1,5 @@
 import { createMachine, spawn, assign, actions } from "xstate";
+import { getTileType } from "../shared/maze";
 const { raise, respond, choose } = actions;
 
 let directions = ["up", "left", "down", "right"];
@@ -228,9 +229,7 @@ const GhostMachine = createMachine(
               { direction, row: nextPosition.row, col: nextPosition.col },
               true
             );
-            return (
-              maze[projectedPosition.row][projectedPosition.col] !== "wall"
-            );
+            return getTileType(maze.tiles, projectedPosition) !== "wall";
           });
 
           if (validDirections.length > 1) {

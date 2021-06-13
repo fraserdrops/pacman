@@ -1,7 +1,21 @@
 import { createMachine, spawn, assign, actions } from "xstate";
+import { getTileType } from "../shared/maze";
 const { raise, respond, choose } = actions;
 
 let directions = ["up", "left", "down", "right"];
+
+const MIN_COL_OFFSET = 0;
+const MAX_COL_OFFSET = 7;
+const MIN_ROW_OFFSET = 0;
+const MAX_ROW_OFFSET = 7;
+
+const CENTER_COL_OFFSET = 3;
+const CENTER_ROW_OFFSET = 4;
+
+const every = (...guards) => ({
+  type: "every",
+  guards,
+});
 
 const getProjectedPosition = (current, direction, ignoreOffsets) => {
   const { row, col, rowOffset, colOffset } = current;
@@ -62,8 +76,8 @@ const getProjectedPosition = (current, direction, ignoreOffsets) => {
 const euclideanDistance = (x1, y1, x2, y2) =>
   Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
 
-const normalSpeed = 2000;
-const scatterSpeed = 3000;
+const normalSpeed = 200;
+const scatterSpeed = 300;
 
 const GhostMachine = createMachine(
   {
@@ -133,7 +147,10 @@ const GhostMachine = createMachine(
                   actions: [
                     choose([
                       {
-                        cond: "canChangeDirection",
+                        cond: every(
+                          "turningWouldNotCollideWithWall",
+                          "inCenterOfTile"
+                        ),
                         // when the ghost reaches the center of a tile, it switches to using the next direction it calculated a tile ago,
                         // then looks ahead to choose a direction for when it reachs the next tile
                         actions: [
@@ -249,9 +266,7 @@ const GhostMachine = createMachine(
               { direction, row: nextPosition.row, col: nextPosition.col },
               true
             );
-            return (
-              maze[projectedPosition.row][projectedPosition.col] !== "wall"
-            );
+            return getTileType(maze.tiles, projectedPosition) !== "wall";
           });
 
           if (validDirections.length > 1) {
@@ -305,10 +320,38 @@ const GhostMachine = createMachine(
       }),
     },
     guards: {
+      get every() {
+        return (ctx, event, { cond }) => {
+          const { guards } = cond;
+          return guards.every((guardKey) => this[guardKey](ctx, event));
+        };
+      },
       noMoreFramesToSkip: (ctx) => ctx.framesToSkip === 1,
       canChangeDirection: (ctx) => {
         const { position } = ctx;
         return position.rowOffset === 4 && position.colOffset === 4;
+      },
+      turningWouldNotCollideWithWall: (ctx) => {
+        const { position, requestedDirection, maze } = ctx;
+        const nextPosition = getProjectedPosition(
+          position,
+          requestedDirection,
+          true
+        );
+        return true;
+        return getTileType(maze.tiles, nextPosition) !== "wall";
+      },
+      inCenterOfTile: (ctx) => {
+        // pacman can turn if he is at the center of the current tile
+        const { direction, position } = ctx;
+        const { colOffset, rowOffset } = position;
+        if (direction === "up" || direction === "down") {
+          return rowOffset === CENTER_ROW_OFFSET;
+        }
+
+        if (direction === "left" || direction === "right") {
+          return colOffset === CENTER_COL_OFFSET;
+        }
       },
     },
   }

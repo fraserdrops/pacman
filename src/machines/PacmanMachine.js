@@ -6,6 +6,7 @@ import {
   actions,
   sendParent,
 } from "xstate";
+import { getTileType } from "../shared/maze";
 const { raise, respond } = actions;
 
 const every = (...guards) => ({
@@ -81,11 +82,8 @@ const getProjectedPosition = (current, direction, ignoreOffsets) => {
 
 const getNextPosition = (current, direction, maze) => {
   let projectedPosition = getProjectedPosition(current, direction);
-  if (maze[projectedPosition.row][projectedPosition.col] !== "wall") {
-    return projectedPosition;
-  } else {
-    return current;
-  }
+  console.log("notmsl", current, projectedPosition);
+  return projectedPosition;
 };
 
 const getNextPositionWhileCornering = (position, corneringDirections) => {
@@ -95,37 +93,52 @@ const getNextPositionWhileCornering = (position, corneringDirections) => {
 
   let rowOffsetDelta = 1;
   let colOffsetDelta = 1;
+  let rowDelta = 0;
+  let colDelta = 0;
 
   // this logic uses that fact that turning invloves a 90 degree change of direction
   // if old == left then to can only be up or down
-  if (current === "left") {
+  if (current === "left" || next === "left") {
     colOffsetDelta = -1;
-  } else if (current === "right") {
+  } else if (current === "right" || next === "right") {
     colOffsetDelta = 1;
   }
 
-  if (current === "up") {
+  if (current === "up" || next === "up") {
     rowOffsetDelta = -1;
-  } else if (current === "down") {
+  } else if (current === "down" || next === "down") {
     rowOffsetDelta = 1;
   }
 
-  if (next === "up") {
-    rowOffsetDelta = -1;
-  } else if (next === "down") {
-    rowOffsetDelta = 1;
+  let nextRowOffset = position.rowOffset + rowOffsetDelta;
+  let nextColOffset = position.colOffset + colOffsetDelta;
+
+  if (position.rowOffset + rowOffsetDelta < MIN_ROW_OFFSET) {
+    rowDelta = -1;
+    nextRowOffset = MAX_ROW_OFFSET;
+  } else if (position.rowOffset + rowOffsetDelta > MAX_ROW_OFFSET) {
+    nextRowOffset = MIN_ROW_OFFSET;
+    rowDelta = 1;
   }
 
-  if (next === "left") {
-    colOffsetDelta = -1;
-  } else if (next === "right") {
-    colOffsetDelta = 1;
+  if (position.colOffset + colOffsetDelta < MIN_COL_OFFSET) {
+    nextColOffset = MAX_COL_OFFSET;
+    colDelta = -1;
+  } else if (position.colOffset + colOffsetDelta > MAX_COL_OFFSET) {
+    nextColOffset = MIN_COL_OFFSET;
+    colDelta = 1;
   }
 
-  const nextRowOffset = position.rowOffset + rowOffsetDelta;
-  const nextColOffset = position.colOffset + colOffsetDelta;
+  const nextRow = position.row + rowDelta;
+  const nextCol = position.col + colDelta;
 
-  return { ...position, rowOffset: nextRowOffset, colOffset: nextColOffset };
+  return {
+    ...position,
+    row: nextRow,
+    col: nextCol,
+    rowOffset: nextRowOffset,
+    colOffset: nextColOffset,
+  };
 };
 
 const PACMAN_PIXELS_PER_SECOND_FULL_SPEED = 80;
@@ -136,14 +149,14 @@ const PacmanMachine = createMachine(
     initial: "moving",
     context: {
       position: {
-        row: 8,
-        col: 8,
+        row: 1,
+        col: 1,
         rowOffset: 4,
         colOffset: 4,
       },
-      direction: "up",
+      direction: "down",
       corneringDirections: {},
-      requestedDirection: "up",
+      requestedDirection: "down",
       nextPosition: {},
       speed: {},
       vals: [],
@@ -189,7 +202,7 @@ const PacmanMachine = createMachine(
               src: () => (callback) => {
                 const interval = setInterval(() => {
                   callback("TICK");
-                }, 2000);
+                }, 100);
 
                 return () => {
                   clearInterval(interval);
@@ -224,9 +237,20 @@ const PacmanMachine = createMachine(
                         cond: every(
                           "turnRequested",
                           "pacmanTurningWouldNotCollideWithWall",
-                          "pacmanTilePositionAllowsTurning"
+                          "pacmanInCenterOfTile"
                         ),
                         target: "#movement.turning",
+                      },
+                      {
+                        cond: "reverseRequested",
+                        target: "#movement.reversing",
+                      },
+                      {
+                        cond: every(
+                          "pacmanInCenterOfTile",
+                          "pacmanWillHitWall"
+                        ),
+                        target: "#movement.walled",
                       },
                       { target: "ready" },
                     ],
@@ -269,6 +293,45 @@ const PacmanMachine = createMachine(
                         target: "#normalMovement",
                         actions: ["turn"],
                       },
+                    ],
+                  },
+                },
+              },
+              reversing: {
+                always: {
+                  target: "normalMovement",
+                  actions: ["reverse"],
+                },
+              },
+              walled: {
+                initial: "ready",
+                states: {
+                  ready: {
+                    entry: [() => console.log("walled")],
+                    on: {
+                      MOVE: {
+                        target: "checkMovementType",
+                      },
+                    },
+                  },
+                  checkMovementType: {
+                    always: [
+                      {
+                        cond: every(
+                          "turnRequested",
+                          "pacmanTurningWouldNotCollideWithWall",
+                          "pacmanInCenterOfTile"
+                        ),
+                        target: "#movement.turning",
+                      },
+                      {
+                        cond: every(
+                          "pacmanInCenterOfTile",
+                          "pacmanWillHitWall"
+                        ),
+                        target: "#movement.walled",
+                      },
+                      { target: "#normalMovement.ready" },
                     ],
                   },
                 },
@@ -335,22 +398,22 @@ const PacmanMachine = createMachine(
                     target: "frightened",
                   },
                 },
-                // invoke: {
-                //   id: "tick",
-                //   src: (ctx) => (callback) => {
-                //     const updateRate =
-                //       1000 /
-                //       (ctx.config.speedPercentage.normal *
-                //         PACMAN_PIXELS_PER_SECOND_FULL_SPEED);
-                //     const interval = setInterval(() => {
-                //       callback("TICK");
-                //     }, 2000);
+                invoke: {
+                  id: "tick",
+                  src: (ctx) => (callback) => {
+                    const updateRate =
+                      1000 /
+                      (ctx.config.speedPercentage.normal *
+                        PACMAN_PIXELS_PER_SECOND_FULL_SPEED);
+                    const interval = setInterval(() => {
+                      callback("TICK");
+                    }, 100);
 
-                //     return () => {
-                //       clearInterval(interval);
-                //     };
-                //   },
-                // },
+                    return () => {
+                      clearInterval(interval);
+                    };
+                  },
+                },
               },
               frightened: {
                 on: {
@@ -368,7 +431,7 @@ const PacmanMachine = createMachine(
                     console.log("update rate frightened", updateRate);
                     const interval = setInterval(() => {
                       callback("TICK");
-                    }, 2000);
+                    }, 100);
 
                     return () => {
                       clearInterval(interval);
@@ -408,6 +471,13 @@ const PacmanMachine = createMachine(
           requestedDirection: undefined,
         };
       }),
+      reverse: assign((ctx) => {
+        return {
+          ...ctx,
+          direction: ctx.requestedDirection,
+          requestedDirection: undefined,
+        };
+      }),
       requestDirection: assign({
         requestedDirection: (ctx, event, { action }) => {
           return action.direction;
@@ -430,6 +500,7 @@ const PacmanMachine = createMachine(
           type: "UPDATE_POSITION",
           position: ctx.position,
           direction: ctx.direction,
+          requestedDirection: ctx.requestedDirection,
           character: "pacman",
         };
       }),
@@ -458,8 +529,6 @@ const PacmanMachine = createMachine(
       turnRequested: (ctx) => {
         // a turn is a 90 degree change of direction e.g. up to left
         const { requestedDirection, direction } = ctx;
-
-        console.log(direction, requestedDirection);
         if (direction === "up" || direction === "down") {
           return (
             requestedDirection === "left" || requestedDirection === "right"
@@ -470,7 +539,19 @@ const PacmanMachine = createMachine(
           return requestedDirection === "up" || requestedDirection === "down";
         }
       },
-      pacmanTilePositionAllowsTurning: (ctx) => {
+      reverseRequested: (ctx) => {
+        // a turn is a 90 degree change of direction e.g. up to left
+        const { requestedDirection, direction } = ctx;
+        let oppositeDirections = {
+          up: "down",
+          down: "up",
+          left: "right",
+          right: "left",
+        };
+
+        return direction === oppositeDirections[requestedDirection];
+      },
+      pacmanInCenterOfTile: (ctx) => {
         // pacman can turn if he is at the center of the current tile
         const { direction, position } = ctx;
         const { colOffset, rowOffset } = position;
@@ -481,6 +562,11 @@ const PacmanMachine = createMachine(
         if (direction === "left" || direction === "right") {
           return colOffset === CENTER_COL_OFFSET;
         }
+      },
+      pacmanWillHitWall: (ctx) => {
+        const { position, direction, maze } = ctx;
+        let projectedPosition = getProjectedPosition(position, direction, true);
+        return getTileType(maze.tiles, projectedPosition) === "wall";
       },
       pacmanTilePositionAllowsCornering: (ctx) => {
         // pacman can corner if he is before the center of the current tile
@@ -507,9 +593,9 @@ const PacmanMachine = createMachine(
         const nextPosition = getProjectedPosition(
           position,
           requestedDirection,
-          false
+          true
         );
-        return maze[nextPosition.row][nextPosition.col] !== "wall";
+        return getTileType(maze.tiles, nextPosition) !== "wall";
       },
       stillCornering: (ctx) => {
         // we are still cornering if pacman is yet to reach the horizontal/vertical center

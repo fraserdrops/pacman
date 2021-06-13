@@ -1,5 +1,4 @@
 import React from "react";
-import { maze1 } from "../shared/maze";
 import { getTileComponent } from "./tiles/getTileComponent";
 const tileSize = 8;
 
@@ -8,15 +7,16 @@ const getColorForType = (type) => {
     wall: "blue",
     pellet: "green",
     powerPellet: "green",
+    houseEntrance: "pink",
   };
 
   return mapColorToType[type];
 };
-const Maze = (props) => {
-  const maze = maze1;
+const Maze = React.memo((props) => {
+  const { maze } = props;
   const tiles = [];
 
-  maze.forEach((row, i) => {
+  maze.tiles.forEach((row, i) => {
     row.forEach((tile, j) => {
       const TileComponent = getTileComponent(tile.type, tile.display);
       const color = getColorForType(tile.type);
@@ -29,7 +29,7 @@ const Maze = (props) => {
       );
     });
   });
-  return <svg>{tiles}</svg>;
-};
+  return <g>{tiles}</g>;
+});
 
 export default Maze;

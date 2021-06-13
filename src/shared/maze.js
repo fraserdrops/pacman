@@ -11,7 +11,7 @@ const createNTiles = (N, type, display) => {
 
 const reflectTile = (tile) => {
   if (tile.type !== "wall") {
-    return tile;
+    return { ...tile };
   }
   const { display } = tile;
   let mapReflectedOrientation = {
@@ -45,7 +45,21 @@ const createRowFromHalf = (tiles) => {
   return row.flat(4);
 };
 
-export const maze1 = [
+export const getTileType = (maze, position) => {
+  return maze[position.row][position.col].type;
+};
+
+export const setTileType = (maze, position, type) => {
+  if (maze[position.row] && maze[position.row][position.col]) {
+    maze[position.row][position.col].type = type;
+  }
+};
+
+export const getTileDisplay = (maze, position) => {
+  return maze[position.row][position.col].display;
+};
+
+export const maze1Tiles = [
   // row 0
   createRowFromHalf([
     ...createNTiles(1, "wall", {
@@ -1101,3 +1115,17 @@ export const maze1 = [
     }),
   ]),
 ];
+
+let maze1PelletsRemaining = 0;
+maze1Tiles.forEach((row, rowIndex) => {
+  row.forEach((tile, colIndex) => {
+    if (tile.type === "pellet") {
+      maze1PelletsRemaining++;
+    }
+  });
+});
+
+export const maze1 = {
+  tiles: maze1Tiles,
+  pelletsRemaining: maze1PelletsRemaining,
+};
