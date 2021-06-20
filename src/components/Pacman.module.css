@@ -1,0 +1,77 @@
+:root {
+  --PI: 3.14159265358979;
+}
+
+.mouthTop,
+.mouthBottom {
+  animation-duration: 110ms;
+  animation-timing-function: linear;
+  animation-direction: alternate;
+  animation-iteration-count: infinite;
+  animation-fill-mode: forwards;
+}
+
+.mouthTop {
+  animation-name: eating;
+}
+
+.mouthBottom {
+  animation-name: eating;
+}
+
+.mouthTopDying,
+.mouthBottomDying {
+  animation-duration: 1000ms;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+  /* animation-direction: alternate; */
+  /* animation-iteration-count: infinite; */
+}
+
+.mouthTopDying {
+  animation-name: dying;
+}
+
+.mouthBottomDying {
+  animation-name: dying;
+}
+
+@keyframes eating {
+  0% {
+    stroke-dasharray: calc((50 * var(--PI) * 2 * 4) / 100)
+      calc(var(--PI) * 2 * 4);
+  }
+  50% {
+    stroke-dasharray: calc(((50 - (20 / 360) * 100) * var(--PI) * 2 * 4) / 100)
+      calc(var(--PI) * 2 * 4);
+  }
+  100% {
+    stroke-dasharray: calc(((50 - (40 / 360) * 100) * var(--PI) * 2 * 4) / 100)
+      calc(var(--PI) * 2 * 4);
+  }
+}
+@keyframes dying {
+  0% {
+    stroke-dasharray: calc((50 * var(--PI) * 2 * 4) / 100)
+      calc(var(--PI) * 2 * 4);
+  }
+  20% {
+    stroke-dasharray: calc((40 * var(--PI) * 2 * 4) / 100)
+      calc(var(--PI) * 2 * 4);
+  }
+  40% {
+    stroke-dasharray: calc((30 * var(--PI) * 2 * 4) / 100)
+      calc(var(--PI) * 2 * 4);
+  }
+  60% {
+    stroke-dasharray: calc((20 * var(--PI) * 2 * 4) / 100)
+      calc(var(--PI) * 2 * 4);
+  }
+  80% {
+    stroke-dasharray: calc((10 * var(--PI) * 2 * 4) / 100)
+      calc(var(--PI) * 2 * 4);
+  }
+  100% {
+    stroke-dasharray: 0 calc(var(--PI) * 2 * 4);
+  }
+}

@@ -7,6 +7,8 @@ import {
   sendParent,
 } from "xstate";
 import { getTileType } from "../shared/maze";
+import { Howl, Howler } from "howler";
+
 const { raise, respond } = actions;
 
 const every = (...guards) => ({
@@ -82,7 +84,6 @@ const getProjectedPosition = (current, direction, ignoreOffsets) => {
 
 const getNextPosition = (current, direction, maze) => {
   let projectedPosition = getProjectedPosition(current, direction);
-  console.log("notmsl", current, projectedPosition);
   return projectedPosition;
 };
 
@@ -175,6 +176,7 @@ const PacmanMachine = createMachine(
     },
     states: {
       moving: {
+        tags: ["moving"],
         type: "parallel",
         on: {
           LEFT: {
@@ -189,8 +191,8 @@ const PacmanMachine = createMachine(
           RIGHT: {
             actions: [{ type: "requestDirection", direction: "right" }],
           },
-          LOSE_LIFE: {
-            target: "dying",
+          PAUSE: {
+            target: "paused",
           },
         },
         states: {
@@ -304,10 +306,10 @@ const PacmanMachine = createMachine(
                 },
               },
               walled: {
+                tags: ["walled"],
                 initial: "ready",
                 states: {
                   ready: {
-                    entry: [() => console.log("walled")],
                     on: {
                       MOVE: {
                         target: "checkMovementType",
@@ -323,6 +325,10 @@ const PacmanMachine = createMachine(
                           "pacmanInCenterOfTile"
                         ),
                         target: "#movement.turning",
+                      },
+                      {
+                        cond: "reverseRequested",
+                        target: "#movement.reversing",
                       },
                       {
                         cond: every(
@@ -343,7 +349,18 @@ const PacmanMachine = createMachine(
             on: {
               EAT_PELLET: {
                 target: "#pelletConsumption.eatingPellet",
-                actions: ["setFramesToSkipTo1"],
+                actions: [
+                  "setFramesToSkipTo1",
+                  () => {
+                    var sound = new Howl({
+                      src: "https://vgmsite.com/soundtracks/pac-man-game-sound-effects/knwtmadt/Chomp.mp3",
+                      html5: true, // A live stream can only be played through HTML5 Audio.
+                      format: ["mp3", "aac"],
+                    });
+                    console.log("audio", sound);
+                    sound.play();
+                  },
+                ],
               },
               EAT_POWER_PELLET: {
                 target: "#pelletConsumption.eatingPowerPellet",
@@ -407,7 +424,7 @@ const PacmanMachine = createMachine(
                         PACMAN_PIXELS_PER_SECOND_FULL_SPEED);
                     const interval = setInterval(() => {
                       callback("TICK");
-                    }, 100);
+                    }, 50);
 
                     return () => {
                       clearInterval(interval);
@@ -428,10 +445,9 @@ const PacmanMachine = createMachine(
                       1000 /
                       (ctx.config.speedPercentage.frightened *
                         PACMAN_PIXELS_PER_SECOND_FULL_SPEED);
-                    console.log("update rate frightened", updateRate);
                     const interval = setInterval(() => {
                       callback("TICK");
-                    }, 100);
+                    }, 50);
 
                     return () => {
                       clearInterval(interval);
@@ -443,8 +459,15 @@ const PacmanMachine = createMachine(
           },
         },
       },
-      paused: {},
+      paused: {
+        on: {
+          LOSE_LIFE: {
+            target: "dying",
+          },
+        },
+      },
       dying: {
+        tags: ["dying"],
         after: {
           3000: {
             target: "waitingToRestart",
@@ -492,8 +515,13 @@ const PacmanMachine = createMachine(
       setFramesToSkipTo3: assign({ framesToSkip: () => 3 }),
       setFramesToSkipTo1: assign({ framesToSkip: () => 1 }),
       updatePosition: assign({
-        position: (ctx) =>
-          getNextPosition(ctx.position, ctx.direction, ctx.maze, false),
+        position: (ctx) => {
+          console.log(
+            "YOUYOYO",
+            getNextPosition(ctx.position, ctx.direction, ctx.maze, false)
+          );
+          return getNextPosition(ctx.position, ctx.direction, ctx.maze, false);
+        },
       }),
       respondWithUpdatedPosition: sendParent((ctx) => {
         return {
@@ -595,7 +623,10 @@ const PacmanMachine = createMachine(
           requestedDirection,
           true
         );
-        return getTileType(maze.tiles, nextPosition) !== "wall";
+        return (
+          getTileType(maze.tiles, nextPosition) !== "wall" &&
+          getTileType(maze.tiles, nextPosition) !== "houseEntrance"
+        );
       },
       stillCornering: (ctx) => {
         // we are still cornering if pacman is yet to reach the horizontal/vertical center

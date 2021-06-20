@@ -22,6 +22,7 @@ const Maze = React.memo((props) => {
       const color = getColorForType(tile.type);
       tiles.push(
         <TileComponent
+          key={`${i}, ${j}`}
           tileSize={tileSize}
           position={{ x: j * tileSize, y: i * tileSize }}
           color={color}
@@ -29,7 +30,12 @@ const Maze = React.memo((props) => {
       );
     });
   });
-  return <g>{tiles}</g>;
+  return (
+    <g>
+      <rect width={28 * tileSize} height={36 * tileSize} fill="black" />
+      {tiles}
+    </g>
+  );
 });
 
 export default Maze;

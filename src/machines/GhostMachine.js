@@ -1,4 +1,4 @@
-import { createMachine, spawn, assign, actions } from "xstate";
+import { createMachine, spawn, assign, actions, send } from "xstate";
 import { getTileType } from "../shared/maze";
 const { raise, respond, choose } = actions;
 
@@ -16,6 +16,17 @@ const every = (...guards) => ({
   type: "every",
   guards,
 });
+
+const CreateTicker = (intervalMS, callbackEventName) => {
+  return () => (callback) => {
+    const interval = setInterval(() => {
+      callback(callbackEventName);
+    }, intervalMS);
+    return () => {
+      clearInterval(interval);
+    };
+  };
+};
 
 const getProjectedPosition = (current, direction, ignoreOffsets) => {
   const { row, col, rowOffset, colOffset } = current;
@@ -76,8 +87,8 @@ const getProjectedPosition = (current, direction, ignoreOffsets) => {
 const euclideanDistance = (x1, y1, x2, y2) =>
   Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
 
-const normalSpeed = 200;
-const scatterSpeed = 300;
+const normalSpeed = 50;
+const scatterSpeed = 30;
 
 const GhostMachine = createMachine(
   {
@@ -95,6 +106,10 @@ const GhostMachine = createMachine(
         row: 1,
         col: 1,
       },
+      scatterTargetTile: {
+        row: 15,
+        col: 15,
+      },
       direction: "up",
       scatterModeTile: {},
       nextDirection: "up",
@@ -103,6 +118,24 @@ const GhostMachine = createMachine(
       gameState: {},
       subscription: {},
       maze: [],
+      gameConfig: {
+        speedPercentage: {
+          tunnel: 0.4,
+          normal: 0.9,
+        },
+      },
+
+      ghostConfig: {
+        scatterTargetTile: {
+          row: 15,
+          col: 15,
+        },
+        targetTile: {
+          row: 1,
+          col: 1,
+        },
+      },
+
       ghostBehaviour: undefined,
     },
     on: {
@@ -113,25 +146,45 @@ const GhostMachine = createMachine(
         target: "playing",
         actions: ["setPosition"],
       },
+      PAUSE: {
+        target: "paused",
+      },
+      HIDE_DISPLAY: {
+        target: "hidden",
+      },
     },
     states: {
       playing: {
-        initial: "normal",
-
+        type: "parallel",
         states: {
-          normal: {
-            initial: "idle",
-            invoke: {
-              id: "tick",
-              src: () => (callback) => {
-                const interval = setInterval(() => {
-                  callback("TICK");
-                }, normalSpeed);
-                return () => {
-                  clearInterval(interval);
-                };
+          // in the maze there are certain zones that affect the ghosts behaviour
+          zone: {
+            initial: "none",
+            states: {
+              on: {
+                NO_ZONE: {
+                  target: "none",
+                },
+                IN_TUNNEL: {
+                  target: "tunnel",
+                },
+                IN_RED_ZONE: {
+                  target: "redZone",
+                },
+              },
+              none: {},
+              redZone: {
+                entry: ["applyRedZoneRestrictions"],
+                exit: ["removeRedZoneRestrictions"],
+              },
+              tunnel: {
+                entry: ["applyTunnelRestrictions"],
+                exit: ["removeTunnelRestrictions"],
               },
             },
+          },
+          movement: {
+            initial: "idle",
             states: {
               idle: {
                 on: {
@@ -143,72 +196,79 @@ const GhostMachine = createMachine(
               },
               updateDirection: {
                 always: {
-                  target: "idle",
+                  target: "checkZone",
                   actions: [
                     choose([
                       {
                         cond: every(
-                          "turningWouldNotCollideWithWall",
+                          // "turningWouldNotCollideWithWall",
                           "inCenterOfTile"
                         ),
                         // when the ghost reaches the center of a tile, it switches to using the next direction it calculated a tile ago,
                         // then looks ahead to choose a direction for when it reachs the next tile
                         actions: [
                           "switchToNextDirection",
-                          "updateTargetTileNormalMode",
                           "chooseNextDirection",
                         ],
                       },
                     ]),
                   ],
                 },
+              },
+              checkZone: {
+                always: [
+                  {
+                    target: "idle",
+                    actions: [
+                      choose([
+                        {
+                          cond: every(
+                            // "turningWouldNotCollideWithWall",
+                            "inRedZone"
+                          ),
+                          // when the ghost reaches the center of a tile, it switches to using the next direction it calculated a tile ago,
+                          // then looks ahead to choose a direction for when it reachs the next tile
+
+                          actions: [send("IN_RED_ZONE")],
+                        },
+                      ]),
+                    ],
+                  },
+                ],
               },
             },
           },
-          scatter: {
-            initial: "idle",
-            invoke: {
-              id: "tick",
-              src: () => (callback) => {
-                const interval = setInterval(() => {
-                  callback("TICK");
-                }, scatterSpeed);
-                return () => {
-                  clearInterval(interval);
-                };
-              },
-            },
+          chaseMode: {
+            initial: "normal",
             states: {
-              idle: {
+              normal: {
                 on: {
+                  SCATTER: {
+                    target: "scatter",
+                    actions: ["setTargetTileScatterMode"],
+                  },
                   TICK: {
-                    target: "updateDirection",
-                    actions: ["setNextPosition"],
+                    actions: ["updateTargetTileNormalMode"],
                   },
                 },
+                invoke: {
+                  id: "tick",
+                  src: CreateTicker(normalSpeed, "TICK"),
+                },
               },
-              updateDirection: {
-                always: {
-                  target: "idle",
-                  actions: [
-                    choose([
-                      {
-                        cond: "canChangeDirection",
-                        // when the ghost reaches the center of a tile, it switches to using the next direction it calculated a tile ago,
-                        // then looks ahead to choose a direction for when it reachs the next tile
-                        actions: [
-                          "switchToNextDirection",
-                          "updateTargetTileScatterMode",
-                          "chooseNextDirection",
-                        ],
-                      },
-                    ]),
-                  ],
+              scatter: {
+                invoke: {
+                  id: "tick",
+                  src: CreateTicker(scatterSpeed, "TICK"),
                 },
               },
             },
           },
         },
+      },
+      paused: {},
+      hidden: {
+        tags: ["hidden"],
       },
       dying: {},
     },
@@ -224,10 +284,17 @@ const GhostMachine = createMachine(
           position: ctx.position,
           direction: ctx.direction,
           character: ctx.character,
+          nextDirection: ctx.nextDirection,
         };
       }),
       setPosition: assign({
         position: (ctx, event) => event.position,
+      }),
+      setTargetTileScatterMode: assign({
+        targetTile: (ctx) => ctx.ghostConfig.scatterTargetTile,
+      }),
+      updateTargetTileNormalMode: assign({
+        targetTile: (ctx) => ctx.ghostConfig.targetTile,
       }),
       updateGameState: assign({
         gameState: (ctx, event) => event.gameState,
@@ -240,6 +307,7 @@ const GhostMachine = createMachine(
           let nextDirection = "up";
           const nextPosition = getProjectedPosition(
             { direction, row: position.row, col: position.col },
+            direction,
             true
           );
 
@@ -263,19 +331,22 @@ const GhostMachine = createMachine(
 
           validDirections = validDirections.filter((direction) => {
             const projectedPosition = getProjectedPosition(
-              { direction, row: nextPosition.row, col: nextPosition.col },
+              { row: nextPosition.row, col: nextPosition.col },
+              direction,
               true
             );
+            const currentTileType = getTileType(maze.tiles, position);
+
             return getTileType(maze.tiles, projectedPosition) !== "wall";
           });
-
           if (validDirections.length > 1) {
             // we choose the direction that moves us closer to the target tile
             // need to find the projected position for each valid direction we could choose
             const distanceToTargetIfDirectionChosen = validDirections.map(
               (direction) => {
                 const projectedPosition = getProjectedPosition(
-                  { direction, row: nextPosition.row, col: nextPosition.col },
+                  { row: nextPosition.row, col: nextPosition.col },
+                  direction,
                   true
                 );
                 return euclideanDistance(
@@ -286,7 +357,6 @@ const GhostMachine = createMachine(
                 );
               }
             );
-
             let directionsWithShortestDistance = [];
             let shortestDistance = Number.MAX_SAFE_INTEGER;
             distanceToTargetIfDirectionChosen.forEach((distance, index) => {
@@ -331,16 +401,17 @@ const GhostMachine = createMachine(
         const { position } = ctx;
         return position.rowOffset === 4 && position.colOffset === 4;
       },
-      turningWouldNotCollideWithWall: (ctx) => {
-        const { position, requestedDirection, maze } = ctx;
-        const nextPosition = getProjectedPosition(
-          position,
-          requestedDirection,
-          true
-        );
-        return true;
-        return getTileType(maze.tiles, nextPosition) !== "wall";
-      },
+      inRedZone: () => true,
+      // turningWouldNotCollideWithWall: (ctx) => {
+      //   const { position, requestedDirection, maze } = ctx;
+      //   const nextPosition = getProjectedPosition(
+      //     position,
+      //     requestedDirection,
+      //     true
+      //   );
+      //   return true;
+      //   return getTileType(maze.tiles, nextPosition) !== "wall";
+      // },
       inCenterOfTile: (ctx) => {
         // pacman can turn if he is at the center of the current tile
         const { direction, position } = ctx;

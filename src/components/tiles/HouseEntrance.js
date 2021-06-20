@@ -3,7 +3,7 @@ export const HouseEntrance = (props) => {
 
   return (
     <g transform={`translate(${position.x}, ${position.y})`}>
-      <path d="M 0,6 H 8" fill="transparent" stroke={color} stroke-width={2} />
+      <path d="M 0,6 H 8" fill="transparent" stroke={color} strokeWidth={2} />
     </g>
   );
 };

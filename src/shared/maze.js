@@ -37,6 +37,25 @@ const reflectTile = (tile) => {
   };
 };
 
+const positionWithinRange = (position, start, end) => {
+  return (
+    start.row <= position.row &&
+    position.row <= end.row &&
+    start.col <= position.col &&
+    position.col <= end.col
+  );
+};
+
+export const getZone = (maze, position) => {
+  const { zones } = maze;
+  Object.keys(zones).forEach((zoneName) => {
+    const { start, end } = zones[zoneName];
+    if (positionWithinRange(position, start, end)) {
+      return zoneName;
+    }
+  });
+};
+
 const createRowFromHalf = (tiles) => {
   const row = [...tiles.flat(4)];
   for (let i = row.length - 1; i >= 0; i--) {
@@ -60,6 +79,9 @@ export const getTileDisplay = (maze, position) => {
 };
 
 export const maze1Tiles = [
+  createRowFromHalf([...createNTiles(14, "empty")]),
+  createRowFromHalf([...createNTiles(14, "empty")]),
+  createRowFromHalf([...createNTiles(14, "empty")]),
   // row 0
   createRowFromHalf([
     ...createNTiles(1, "wall", {
@@ -1114,6 +1136,8 @@ export const maze1Tiles = [
       orientation: "bottom",
     }),
   ]),
+  createRowFromHalf([...createNTiles(14, "empty")]),
+  createRowFromHalf([...createNTiles(14, "empty")]),
 ];
 
 let maze1PelletsRemaining = 0;
@@ -1127,5 +1151,19 @@ maze1Tiles.forEach((row, rowIndex) => {
 
 export const maze1 = {
   tiles: maze1Tiles,
+  ghostHouse: {
+    start: { row: 1, col: 1 },
+    end: { row: 1, col: 1 },
+  },
+  zones: {
+    red: {
+      start: { row: 1, col: 1 },
+      end: { row: 1, col: 1 },
+    },
+    tunnel: {
+      start: { row: 1, col: 1 },
+      end: { row: 1, col: 1 },
+    },
+  },
   pelletsRemaining: maze1PelletsRemaining,
 };

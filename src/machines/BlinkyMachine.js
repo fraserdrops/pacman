@@ -1,4 +1,4 @@
-import { createMachine, spawn, assign, actions } from "xstate";
+import { actions, assign, createMachine } from "xstate";
 import { getTileType } from "../shared/maze";
 const { raise, respond, choose } = actions;
 

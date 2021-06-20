@@ -4,8 +4,8 @@ import GhostMachine from "./GhostMachine";
 import { maze1, getTileType, setTileType } from "../shared/maze";
 
 const { pure } = actions;
-const GHOST_HOUSE_ROW = 10;
-const GHOST_HOUSE_LEFT_COL = 10;
+const GHOST_HOUSE_ROW = 11;
+const GHOST_HOUSE_LEFT_COL = 9;
 const GHOST_HOUSE_MIDDLE_COL = 11;
 const GHOST_HOUSE_RIGHT_COL = 12;
 
@@ -84,7 +84,12 @@ const parent = createMachine(
                 PacmanMachine.withContext({
                   ...PacmanMachine.context,
                   maze: ctx.maze,
-                  position: characterStartPositions.pacman,
+                  position: {
+                    row: 3,
+                    col: 3,
+                    rowOffset: 4,
+                    colOffset: 3,
+                  },
                 }),
                 "pacman"
               ),
@@ -97,59 +102,83 @@ const parent = createMachine(
                     maze: ctx.maze,
                     character: "inky",
                     position: characterStartPositions.inky,
-                    targetTile: {
-                      row: 1,
-                      col: 2,
+                    ghostConfig: {
+                      scatterTargetTile: {
+                        row: 15,
+                        col: 15,
+                      },
+                      targetTile: {
+                        row: 1,
+                        col: 1,
+                      },
                     },
                   }),
                   "inky"
                 ),
               },
-              // pinky: {
-              //   ref: spawn(
-              //     GhostMachine.withContext({
-              //       ...GhostMachine.context,
-              //       maze: ctx.maze,
-              //       character: "pinky",
-              //       position: characterStartPositions.pinky,
-              //       targetTile: {
-              //         row: 1,
-              //         col: 2,
-              //       },
-              //     }),
-              //     "pinky"
-              //   ),
-              // },
-              // clyde: {
-              //   ref: spawn(
-              //     GhostMachine.withContext({
-              //       ...GhostMachine.context,
-              //       maze: ctx.maze,
-              //       character: "clyde",
-              //       position: characterStartPositions.clyde,
-              //       targetTile: {
-              //         row: 1,
-              //         col: 2,
-              //       },
-              //     }),
-              //     "clyde"
-              //   ),
-              // },
-              // blinky: {
-              //   ref: spawn(
-              //     GhostMachine.withContext({
-              //       ...GhostMachine.context,
-              //       maze: ctx.maze,
-              //       character: "blinky",
-              //       position: characterStartPositions.blinky,
-              //       targetTile: {
-              //         row: 1,
-              //         col: 2,
-              //       },
-              //     }),
-              //     "blinky"
-              //   ),
-              // },
+              pinky: {
+                ref: spawn(
+                  GhostMachine.withContext({
+                    ...GhostMachine.context,
+                    maze: ctx.maze,
+                    character: "pinky",
+                    position: characterStartPositions.pinky,
+                    ghostConfig: {
+                      scatterTargetTile: {
+                        row: 3,
+                        col: 3,
+                      },
+                      targetTile: {
+                        row: 12,
+                        col: 12,
+                      },
+                    },
+                  }),
+                  "pinky"
+                ),
+              },
+              clyde: {
+                ref: spawn(
+                  GhostMachine.withContext({
+                    ...GhostMachine.context,
+                    maze: ctx.maze,
+                    character: "clyde",
+                    position: characterStartPositions.clyde,
+                    ghostConfig: {
+                      scatterTargetTile: {
+                        row: 12,
+                        col: 3,
+                      },
+                      targetTile: {
+                        row: 12,
+                        col: 3,
+                      },
+                    },
+                  }),
+                  "clyde"
+                ),
+              },
+              blinky: {
+                ref: spawn(
+                  GhostMachine.withContext({
+                    ...GhostMachine.context,
+                    maze: ctx.maze,
+                    character: "blinky",
+                    position: characterStartPositions.blinky,
+                    ghostConfig: {
+                      scatterTargetTile: {
+                        row: 3,
+                        col: 12,
+                      },
+                      targetTile: {
+                        row: 12,
+                        col: 3,
+                      },
+                    },
+                  }),
+                  "blinky"
+                ),
+              },
             }),
           }),
         ],
@@ -270,7 +299,7 @@ const parent = createMachine(
                         {
                           in: "#normalChaseMode",
                           target: "#lostLife",
-                          actions: [""],
+                          actions: ["pauseCharacters"],
                         },
                         {
                           target: "checkDotConsumption",
@@ -341,19 +370,13 @@ const parent = createMachine(
                       src: () => (callback) => {
                         const chaseScatterMode = [
                           { mode: "CHASE", startTime: 2 },
+                          { mode: "SCATTER", startTime: 5 },
                         ];
                         chaseScatterMode.forEach((period) => {
                           setTimeout(() => {
                             callback(period.mode);
                           }, period.startTime * 1000);
                         });
-                        const interval = setInterval(() => {
-                          callback("TICK");
-                        }, 2000);
-
-                        return () => {
-                          clearInterval(interval);
-                        };
                       },
                     },
                     on: {
@@ -375,13 +398,14 @@ const parent = createMachine(
                         on: {
                           SCATTER: {
                             target: "scatter",
+                            actions: ["notifyScatterMode"],
                           },
                         },
                       },
                     },
                   },
                   frightened: {
-                    id: "hideChaseMode",
+                    id: "frightened",
                     invoke: {
                       id: "frightenedModeTimer",
                       src: (ctx) => (callback) => {
@@ -411,11 +435,30 @@ const parent = createMachine(
           },
           lostLife: {
             id: "lostLife",
-            after: {
-              3000: {
-                target: "getReady",
-                actions: ["resetCharacterPositions"],
+            initial: "stopped",
+            states: {
+              stopped: {
+                after: {
+                  2000: {
+                    target: "dying",
+                    actions: ["tellPacmanAboutDying", "hideGhosts"],
+                  },
+                },
               },
+              dying: {
+                after: {
+                  3000: {
+                    target: "finishedDying",
+                    actions: ["resetCharacterPositions"],
+                  },
+                },
+              },
+              finishedDying: {
+                type: "fina",
+              },
+            },
+            onDone: {
+              target: "getReady",
             },
           },
           paused: {
@@ -490,6 +533,7 @@ const parent = createMachine(
                 ...ctx.ghosts[event.character],
                 position: event.position,
                 direction: event.direction,
+                nextDirection: event.nextDirection,
               },
             },
           };
@@ -503,16 +547,58 @@ const parent = createMachine(
           return updatedMaze;
         },
       }),
+      tellPacmanAboutDying: send({ type: "LOSE_LIFE" }, { to: "pacman" }),
       notifyPacmanPellet: send({ type: "EAT_PELLET" }, { to: "pacman" }),
       notifyPacmanPowerPellet: send(
         { type: "EAT_POWER_PELLET" },
         { to: "pacman" }
       ),
+      pauseCharacters: pure((ctx) => {
+        return ["pacman", ...Object.keys(ctx.ghosts)].map((character) =>
+          send(
+            {
+              type: "PAUSE",
+            },
+            { to: character }
+          )
+        );
+      }),
+      hideGhosts: pure((ctx) => {
+        return [...Object.keys(ctx.ghosts)].map((character) =>
+          send(
+            {
+              type: "HIDE_DISPLAY",
+            },
+            { to: character }
+          )
+        );
+      }),
       notifyFrightenedMode: pure((ctx) => {
         return ["pacman", ...Object.keys(ctx.ghosts)].map((character) =>
           send(
             {
               type: "FRIGHTENED",
+            },
+            { to: character }
+          )
+        );
+      }),
+      notifyChaseMode: pure((ctx) => {
+        return ["pacman", ...Object.keys(ctx.ghosts)].map((character) =>
+          send(
+            {
+              type: "CHASE",
+            },
+            { to: character }
+          )
+        );
+      }),
+      notifyScatterMode: pure((ctx) => {
+        console.log("notifiyin");
+        return ["pacman", ...Object.keys(ctx.ghosts)].map((character) =>
+          send(
+            {
+              type: "SCATTER",
             },
             { to: character }
           )
@@ -526,16 +612,6 @@ const parent = createMachine(
           send(
             {
               type: "END_FRIGHT",
-            },
-            { to: character }
-          )
-        );
-      }),
-      notifyScatterMode: pure((ctx) => {
-        return ["pacman", ...Object.keys(ctx.ghosts)].map((character) =>
-          send(
-            {
-              type: "FRIGHTENED",
             },
             { to: character }
           )
