@@ -53,35 +53,32 @@ const Ghost = React.memo((props) => {
   }
   return (
     <g
-      transform={`translate(${position.col * tileSize + position.colOffset}
-    ${position.row * tileSize + position.rowOffset}) rotate(${
-        mapDirectionToRotation[direction]
-      })`}
+      transform={`translate(${
+        position.col * tileSize + position.colOffset - tileSize / 2
+      }
+    ${
+      position.row * tileSize + position.rowOffset - tileSize / 2 - 1
+    }), scale(0.9, 0.9)`}
     >
-      <g transform={`rotate(180 0 0) `}>
-        <circle
-          r="4"
-          cx="0"
-          cy="0"
+      <g transform={``}>
+        <path
+          d="M0, 6 a6,6 0 0 1 12,0 v4 h -12 z"
+          fill={color}
           stroke={color}
-          fill="transparent"
-          stroke-width="8"
-          stroke-dasharray={`${
-            ((50 - (topGapAngle / 360) * 100) * circumference) / 100
-          } ${circumference}`}
         />
       </g>
-      <g transform="rotate(-180 0 0), scale(1, -1) ,translate(0, 0)">
-        <circle
-          r="4"
-          cx="0"
-          cy="0"
+      <g transform={``} className={styles.shapeOne}>
+        <path
+          d="M12, 10 v1.7 L 10.5 10 L 8.5 12.2 L 7.5 12.2 L 7.5 10.2 L 6 10.2 L 4.5 10.2 L 4.5 12.2 L 3.5 12.2 L 1.5 10 L 0 11.7 L 0 10"
+          fill={color}
           stroke={color}
-          fill="transparent"
-          stroke-width="8"
-          stroke-dasharray={`${
-            ((50 - (bottomGapAngle / 360) * 100) * circumference) / 100
-          } ${circumference}`}
+        />
+      </g>
+      <g className={styles.shapeTwo}>
+        <path
+          d="M12, 10 v1  L 11 12 L 9.75 11    L 8.5 10 L 7.25 11    L 6 12   L 4.75 11  L 3.5 10   L 2.25 11  L 1 12   L 0, 11 L 0 10"
+          fill={color}
+          stroke={color}
         />
       </g>
     </g>

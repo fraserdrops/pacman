@@ -57,7 +57,7 @@ const Pacman = React.memo((props) => {
       transform={`translate(${position.col * tileSize + position.colOffset}
     ${position.row * tileSize + position.rowOffset}) rotate(${
         mapDirectionToRotation[direction]
-      })`}
+      }) scale (0.75 0.75)`}
     >
       <g transform={`rotate(180 0 0) `}>
         <circle
