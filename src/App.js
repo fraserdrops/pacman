@@ -26,10 +26,6 @@ const selectPosition = (state) => state.context.pacman.position;
 const selectGhosts = (state) => state.context.ghosts;
 const selectMaze = (state) => state.context.maze;
 
-const compare = (prev, next) => {
-  console.log(prev, next, prev === next);
-  return prev === next;
-};
 function App() {
   // const [state, send] = useMachine(GameMachine, { devTools: true });
   const service = useInterpret(GameMachine);
@@ -37,8 +33,6 @@ function App() {
   // const pacman = useInterpret(testPacman);
   const ghosts = useSelector(service, selectGhosts);
   const maze = useSelector(service, selectMaze);
-  // console.log(pacman.position);
-  console.log("yoza");
 
   useEffect(() => {
     window.addEventListener("keydown", (e) => {

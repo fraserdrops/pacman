@@ -89,6 +89,8 @@ const euclideanDistance = (x1, y1, x2, y2) =>
 
 const normalSpeed = 50;
 const scatterSpeed = 30;
+const frightSpeed = 100;
+const returningSpeed = 20;
 
 const GhostMachine = createMachine(
   {
@@ -146,9 +148,7 @@ const GhostMachine = createMachine(
         target: "playing",
         actions: ["setPosition"],
       },
-      PAUSE: {
-        target: "paused",
-      },
+
       HIDE_DISPLAY: {
         target: "hidden",
       },
@@ -156,6 +156,7 @@ const GhostMachine = createMachine(
     states: {
       playing: {
         type: "parallel",
+
         states: {
           // in the maze there are certain zones that affect the ghosts behaviour
           zone: {
@@ -185,6 +186,12 @@ const GhostMachine = createMachine(
           },
           movement: {
             initial: "idle",
+            on: {
+              PAUSE: {
+                target: ".paused",
+              },
+            },
+
             states: {
               idle: {
                 on: {
@@ -236,30 +243,86 @@ const GhostMachine = createMachine(
                   },
                 ],
               },
+              paused: {
+                on: {
+                  RESUME: {
+                    target: "idle",
+                  },
+                },
+              },
             },
           },
           chaseMode: {
             initial: "normal",
+            on: {},
             states: {
               normal: {
+                tags: ["normal"],
+                initial: "chase",
                 on: {
-                  SCATTER: {
-                    target: "scatter",
-                    actions: ["setTargetTileScatterMode"],
-                  },
-                  TICK: {
-                    actions: ["updateTargetTileNormalMode"],
+                  FRIGHTENED: {
+                    target: "frightened",
                   },
                 },
-                invoke: {
-                  id: "tick",
-                  src: CreateTicker(normalSpeed, "TICK"),
+                states: {
+                  hist: {
+                    type: "history",
+                  },
+                  chase: {
+                    on: {
+                      SCATTER: {
+                        target: "scatter",
+                        actions: ["setTargetTileScatterMode"],
+                      },
+                      TICK: {
+                        actions: ["updateTargetTileNormalMode"],
+                      },
+                    },
+                    invoke: {
+                      id: "tick",
+                      src: CreateTicker(normalSpeed, "TICK"),
+                    },
+                  },
+                  scatter: {
+                    invoke: {
+                      id: "tick",
+                      src: CreateTicker(scatterSpeed, "TICK"),
+                    },
+                  },
                 },
               },
-              scatter: {
+              frightened: {
+                tags: ["frightened"],
                 invoke: {
                   id: "tick",
-                  src: CreateTicker(scatterSpeed, "TICK"),
+                  src: CreateTicker(frightSpeed, "TICK"),
+                  FRIGHTENED: {
+                    target: "frightened",
+                  },
+                },
+                on: {
+                  END_FRIGHT: {
+                    target: "normal",
+                  },
+                  DIED: {
+                    target: "dead",
+                  },
+                },
+              },
+              dead: {
+                tags: ["dead"],
+                on: {
+                  RESUME: {
+                    target: "returningHome",
+                    actions: ["setHomeTargetTile"],
+                  },
+                },
+              },
+              returningHome: {
+                tags: ["returningHome"],
+                invoke: {
+                  id: "tick",
+                  src: CreateTicker(returningSpeed, "TICK"),
                 },
               },
             },
@@ -295,6 +358,9 @@ const GhostMachine = createMachine(
       }),
       updateTargetTileNormalMode: assign({
         targetTile: (ctx) => ctx.ghostConfig.targetTile,
+      }),
+      setHomeTargetTile: assign({
+        targetTile: (ctx) => ctx.ghostConfig.homeTile,
       }),
       updateGameState: assign({
         gameState: (ctx, event) => event.gameState,

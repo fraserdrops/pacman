@@ -71,7 +71,7 @@ const parent = createMachine(
       maze: maze1,
       waitingForResponse: [],
       gameConfig: {
-        frightenedModeDuration: 10,
+        frightenedModeDuration: 5,
       },
     },
     initial: "initial",
@@ -111,6 +111,7 @@ const parent = createMachine(
                         row: 1,
                         col: 1,
                       },
+                      homeTile: characterStartPositions.inky,
                     },
                   }),
                   "inky"
@@ -132,6 +133,7 @@ const parent = createMachine(
                         row: 12,
                         col: 12,
                       },
+                      homeTile: characterStartPositions.pinky,
                     },
                   }),
                   "pinky"
@@ -153,6 +155,7 @@ const parent = createMachine(
                         row: 12,
                         col: 3,
                       },
+                      homeTile: characterStartPositions.clyde,
                     },
                   }),
                   "clyde"
@@ -174,6 +177,7 @@ const parent = createMachine(
                         row: 12,
                         col: 3,
                       },
+                      homeTile: characterStartPositions.blinky,
                     },
                   }),
                   "blinky"
@@ -302,8 +306,12 @@ const parent = createMachine(
                           actions: ["pauseCharacters"],
                         },
                         {
-                          target: "checkDotConsumption",
-                          actions: ["clearWaitingFor"],
+                          target: "#ghostDied",
+                          actions: [
+                            "clearWaitingFor",
+                            "pauseCharacters",
+                            "notifyGhostsDead",
+                          ],
                         },
                       ],
                       NO_GHOST_COLLISIONS: {
@@ -461,6 +469,15 @@ const parent = createMachine(
               target: "getReady",
             },
           },
+          ghostDied: {
+            id: "ghostDied",
+            after: {
+              2000: {
+                actions: ["notifyResume"],
+                target: "playing",
+              },
+            },
+          },
           paused: {
             on: {
               PLAY: {
@@ -553,6 +570,26 @@ const parent = createMachine(
         { type: "EAT_POWER_PELLET" },
         { to: "pacman" }
       ),
+      notifyResume: pure((ctx) => {
+        return ["pacman", ...Object.keys(ctx.ghosts)].map((character) =>
+          send(
+            {
+              type: "RESUME",
+            },
+            { to: character }
+          )
+        );
+      }),
+      notifyGhostsDead: pure((ctx, event) => {
+        return event.ghosts.map((ghost) =>
+          send(
+            {
+              type: "DIED",
+            },
+            { to: ghost }
+          )
+        );
+      }),
       pauseCharacters: pure((ctx) => {
         return ["pacman", ...Object.keys(ctx.ghosts)].map((character) =>
           send(
@@ -574,6 +611,7 @@ const parent = createMachine(
         );
       }),
       notifyFrightenedMode: pure((ctx) => {
+        console.log("NOTIFY");
         return ["pacman", ...Object.keys(ctx.ghosts)].map((character) =>
           send(
             {
@@ -594,7 +632,6 @@ const parent = createMachine(
         );
       }),
       notifyScatterMode: pure((ctx) => {
-        console.log("notifiyin");
         return ["pacman", ...Object.keys(ctx.ghosts)].map((character) =>
           send(
             {

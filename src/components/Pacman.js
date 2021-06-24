@@ -4,13 +4,11 @@ import styles from "./Pacman.module.css";
 import { Howl, Howler } from "howler";
 
 const selectPosition = (state) => {
-  console.log(state);
   return state.context.position;
 };
 const selectContext = (state) => state.context;
 const selectDirection = (state) => state.context.direction;
 const compare = (prev, next) => {
-  console.log(prev, next, prev === next);
   return false;
 };
 

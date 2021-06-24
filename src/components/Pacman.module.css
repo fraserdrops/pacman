@@ -4,7 +4,7 @@
 
 .mouthTop,
 .mouthBottom {
-  animation-duration: 110ms;
+  animation-duration: 150ms;
   animation-timing-function: linear;
   animation-direction: alternate;
   animation-iteration-count: infinite;
@@ -41,12 +41,16 @@
     stroke-dasharray: calc((50 * var(--PI) * 2 * 4) / 100)
       calc(var(--PI) * 2 * 4);
   }
-  50% {
+  33% {
     stroke-dasharray: calc(((50 - (20 / 360) * 100) * var(--PI) * 2 * 4) / 100)
       calc(var(--PI) * 2 * 4);
   }
-  100% {
+  66% {
     stroke-dasharray: calc(((50 - (40 / 360) * 100) * var(--PI) * 2 * 4) / 100)
+      calc(var(--PI) * 2 * 4);
+  }
+  100% {
+    stroke-dasharray: calc(((50 - (60 / 360) * 100) * var(--PI) * 2 * 4) / 100)
       calc(var(--PI) * 2 * 4);
   }
 }

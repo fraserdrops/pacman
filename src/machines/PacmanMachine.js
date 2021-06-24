@@ -357,7 +357,6 @@ const PacmanMachine = createMachine(
                       html5: true, // A live stream can only be played through HTML5 Audio.
                       format: ["mp3", "aac"],
                     });
-                    console.log("audio", sound);
                     sound.play();
                   },
                 ],
@@ -464,6 +463,9 @@ const PacmanMachine = createMachine(
           LOSE_LIFE: {
             target: "dying",
           },
+          RESUME: {
+            target: "moving",
+          },
         },
       },
       dying: {
@@ -516,10 +518,6 @@ const PacmanMachine = createMachine(
       setFramesToSkipTo1: assign({ framesToSkip: () => 1 }),
       updatePosition: assign({
         position: (ctx) => {
-          console.log(
-            "YOUYOYO",
-            getNextPosition(ctx.position, ctx.direction, ctx.maze, false)
-          );
           return getNextPosition(ctx.position, ctx.direction, ctx.maze, false);
         },
       }),
