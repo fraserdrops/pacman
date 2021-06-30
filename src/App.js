@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import "./App.css";
 import Maze from "./components/Maze";
 import Pacman from "./components/Pacman";
-import Ghost from "./components/Ghost";
+import Ghost from "./components/ghost/Ghost";
 import GameMachine from "./machines/GameMachine";
 
 // inspect({
@@ -24,7 +24,9 @@ const tileSize = 8;
 const selectPacman = (state) => state.context.pacman;
 const selectPosition = (state) => state.context.pacman.position;
 const selectGhosts = (state) => state.context.ghosts;
+const selectPoints = (state) => state.context.totalPoints;
 const selectMaze = (state) => state.context.maze;
+const selectGetReady = (state) => state.hasTag("getReady");
 
 function App() {
   // const [state, send] = useMachine(GameMachine, { devTools: true });
@@ -33,6 +35,8 @@ function App() {
   // const pacman = useInterpret(testPacman);
   const ghosts = useSelector(service, selectGhosts);
   const maze = useSelector(service, selectMaze);
+  const points = useSelector(service, selectPoints);
+  const getReady = useSelector(service, selectGetReady);
 
   useEffect(() => {
     window.addEventListener("keydown", (e) => {
@@ -77,7 +81,7 @@ function App() {
           }
         }}
       >
-        <Maze maze={maze} />
+        <Maze maze={maze} tileSize={tileSize} />
 
         <Pacman actorRef={pacman.ref} tileSize={tileSize} />
         {Object.keys(ghosts).map((ghostId) => {
@@ -89,6 +93,24 @@ function App() {
             />
           );
         })}
+        <text
+          x={tileSize * 0 + tileSize / 2}
+          y={tileSize * 2 + tileSize / 2}
+          stroke="white"
+          style={{ fontSize: 8 }}
+        >
+          {points}
+        </text>
+        {getReady && (
+          <text
+            x={tileSize * 12 + tileSize / 2}
+            y={tileSize * 20 + tileSize / 2 + 3}
+            stroke="white"
+            style={{ fontSize: 8 }}
+          >
+            READY!
+          </text>
+        )}
       </svg>
       {/* <p>Game State: {JSON.stringify(state.value)}</p> */}
       <div>

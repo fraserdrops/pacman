@@ -142,12 +142,10 @@ const getNextPositionWhileCornering = (position, corneringDirections) => {
   };
 };
 
-const PACMAN_PIXELS_PER_SECOND_FULL_SPEED = 80;
-
 const PacmanMachine = createMachine(
   {
     id: "pacman",
-    initial: "moving",
+    initial: "ready",
     context: {
       position: {
         row: 1,
@@ -165,6 +163,7 @@ const PacmanMachine = createMachine(
       maze: [],
       framesToSkip: 0,
       config: {
+        baseSpeed: 35,
         speedPercentage: {
           frightened: 0.8,
           normal: 0.9,
@@ -175,8 +174,15 @@ const PacmanMachine = createMachine(
       GAME_SYNC: { actions: ["respondWithUpdatedPosition"] },
     },
     states: {
-      moving: {
-        tags: ["moving"],
+      ready: {
+        on: {
+          START: {
+            target: "playing",
+          },
+        },
+      },
+      playing: {
+        tags: ["playing"],
         type: "parallel",
         on: {
           LEFT: {
@@ -420,10 +426,10 @@ const PacmanMachine = createMachine(
                     const updateRate =
                       1000 /
                       (ctx.config.speedPercentage.normal *
-                        PACMAN_PIXELS_PER_SECOND_FULL_SPEED);
+                        ctx.config.baseSpeed);
                     const interval = setInterval(() => {
                       callback("TICK");
-                    }, 50);
+                    }, updateRate);
 
                     return () => {
                       clearInterval(interval);
@@ -443,10 +449,10 @@ const PacmanMachine = createMachine(
                     const updateRate =
                       1000 /
                       (ctx.config.speedPercentage.frightened *
-                        PACMAN_PIXELS_PER_SECOND_FULL_SPEED);
+                        ctx.config.baseSpeed);
                     const interval = setInterval(() => {
                       callback("TICK");
-                    }, 50);
+                    }, updateRate);
 
                     return () => {
                       clearInterval(interval);
@@ -464,7 +470,7 @@ const PacmanMachine = createMachine(
             target: "dying",
           },
           RESUME: {
-            target: "moving",
+            target: "playing",
           },
         },
       },
@@ -479,7 +485,7 @@ const PacmanMachine = createMachine(
       waitingToRestart: {
         on: {
           RESET_POSITION: {
-            target: "moving",
+            target: "ready",
             actions: ["clearFramesToSkip", "setPosition"],
           },
         },

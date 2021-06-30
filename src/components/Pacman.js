@@ -30,7 +30,7 @@ const Pacman = React.memo((props) => {
     return null;
   }
 
-  const showEating = state.hasTag("moving") && !state.hasTag("walled");
+  const showEating = state.hasTag("playing") && !state.hasTag("walled");
   const showDying = state.hasTag("dying");
 
   let radius = 4;
@@ -40,7 +40,6 @@ const Pacman = React.memo((props) => {
   let topGapAngle = 20;
   let bottomGapAngle = 20;
   const circumference = Math.PI * 2 * radius;
-
   let topClass;
   let bottomClass;
   if (showEating) {

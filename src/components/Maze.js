@@ -1,6 +1,5 @@
 import React from "react";
 import { getTileComponent } from "./tiles/getTileComponent";
-const tileSize = 8;
 
 const getColorForType = (type) => {
   const mapColorToType = {
@@ -13,7 +12,7 @@ const getColorForType = (type) => {
   return mapColorToType[type];
 };
 const Maze = React.memo((props) => {
-  const { maze } = props;
+  const { maze, tileSize } = props;
   const tiles = [];
 
   maze.tiles.forEach((row, i) => {

@@ -2,22 +2,6 @@ import { useActor } from "@xstate/react";
 import React from "react";
 import styles from "./Ghost.module.css";
 
-const selectPosition = (state) => {
-  return state.context.position;
-};
-const selectContext = (state) => state.context;
-const selectDirection = (state) => state.context.direction;
-const compare = (prev, next) => {
-  return false;
-};
-
-const mapDirectionToRotation = {
-  right: 0,
-  down: 90,
-  left: 180,
-  up: 270,
-};
-
 const makeSquiggle = (
   startX,
   startY,
@@ -134,29 +118,8 @@ const Ghost = React.memo((props) => {
   if (!position) {
     return null;
   }
-  console.log(makeSquiggle(3, 5, 6, 3, 2));
   const frightColor = "#2020F7";
   let ghostColor = state.hasTag("frightened") ? frightColor : color;
-  const showEating = state.hasTag("moving") && !state.hasTag("walled");
-  const showDying = state.hasTag("dying");
-
-  let radius = 4;
-  const cx = radius * 2;
-  const cy = cx;
-  const strokeWidth = radius * 2;
-  let topGapAngle = 20;
-  let bottomGapAngle = 20;
-  const circumference = Math.PI * 2 * radius;
-
-  let topClass = styles.mouthTop;
-  let bottomClass = styles.m;
-  if (showEating) {
-    topClass = styles.mouthTop;
-    bottomClass = styles.mouthBottom;
-  } else if (showDying) {
-    topClass = styles.mouthTopDying;
-    bottomClass = styles.mouthBottomDying;
-  }
 
   if (state.hasTag("hidden")) {
     return null;
@@ -229,13 +192,27 @@ const Ghost = React.memo((props) => {
               <path d={makeSquiggle(2, 8.5, 8, 5, 1)} stroke="white" />
             </g>
           )}
+
+          {state.hasTag("frightEnding") && (
+            <g>
+              <g transform={`translate(4, 5)`}>
+                <ellipse rx="1" ry="1" fill="white" />
+              </g>
+              <g transform={`translate(8, 5)`}>
+                <ellipse rx="1" ry="1" fill="white" />
+              </g>
+              <path d={makeSquiggle(2, 8.5, 8, 5, 1)} stroke="white" />
+            </g>
+          )}
         </g>
       )}
       {state.hasTag("dead") && (
         <text
-          color="lightblue"
-          stroke="lightblue"
-          style={{ color: "lightblue" }}
+          y={tileSize}
+          textAnchor="center"
+          color="#00F5F6"
+          stroke="#00F5F6"
+          style={{ color: "#00F5F6", fontSize: 10, fontWeight: 200 }}
         >
           200
         </text>

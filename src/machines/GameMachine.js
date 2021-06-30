@@ -4,10 +4,12 @@ import GhostMachine from "./GhostMachine";
 import { maze1, getTileType, setTileType } from "../shared/maze";
 
 const { pure } = actions;
-const GHOST_HOUSE_ROW = 11;
-const GHOST_HOUSE_LEFT_COL = 9;
-const GHOST_HOUSE_MIDDLE_COL = 11;
-const GHOST_HOUSE_RIGHT_COL = 12;
+const GHOST_HOUSE_ROW = 17;
+const GHOST_HOUSE_LEFT_COL = 12;
+const GHOST_HOUSE_MIDDLE_COL = 13;
+const GHOST_HOUSE_RIGHT_COL = 14;
+const CENTER_COL_OFFSET = 3;
+const CENTER_ROW_OFFSET = 4;
 
 const createGameStateForCharacters = (ctx) => {
   const gameState = {
@@ -31,33 +33,46 @@ const characterStartPositions = {
   pacman: {
     row: 3,
     col: 3,
-    rowOffset: 4,
-    colOffset: 3,
+    rowOffset: CENTER_ROW_OFFSET,
+    colOffset: CENTER_COL_OFFSET,
   },
   inky: {
     row: GHOST_HOUSE_ROW,
     col: GHOST_HOUSE_LEFT_COL,
-    rowOffset: 4,
-    colOffset: 3,
+    rowOffset: CENTER_ROW_OFFSET,
+    colOffset: CENTER_COL_OFFSET,
   },
   pinky: {
-    row: GHOST_HOUSE_ROW - 1,
+    row: GHOST_HOUSE_ROW,
     col: GHOST_HOUSE_MIDDLE_COL,
-    rowOffset: 4,
-    colOffset: 4,
+    rowOffset: CENTER_ROW_OFFSET,
+    colOffset: CENTER_COL_OFFSET,
   },
   clyde: {
-    row: GHOST_HOUSE_ROW - 1,
+    row: GHOST_HOUSE_ROW,
     col: GHOST_HOUSE_RIGHT_COL,
-    rowOffset: 4,
-    colOffset: 4,
+    rowOffset: CENTER_ROW_OFFSET,
+    colOffset: CENTER_COL_OFFSET,
   },
   blinky: {
-    row: GHOST_HOUSE_ROW - 1,
+    row: GHOST_HOUSE_ROW,
     col: GHOST_HOUSE_MIDDLE_COL,
-    rowOffset: 4,
-    colOffset: 3,
+    rowOffset: CENTER_ROW_OFFSET,
+    colOffset: CENTER_COL_OFFSET,
   },
+};
+
+const getPoints = (event) => {
+  const pointsMap = {
+    pellet: 10,
+    powerPellet: 50,
+    fruit: 100,
+    ghost1: 200,
+    ghost2: 400,
+    ghost3: 800,
+    ghost4: 1600,
+  };
+  return pointsMap[event];
 };
 
 const parent = createMachine(
@@ -68,11 +83,15 @@ const parent = createMachine(
         ref: undefined,
       },
       ghosts: {},
+      deadGhosts: [],
       maze: maze1,
       waitingForResponse: [],
       gameConfig: {
-        frightenedModeDuration: 5,
+        frightenedModeStartDuration: 5,
+        frightenedModeEndingDuration: 5,
       },
+      totalPoints: 0,
+      ghostsEaten: 0,
     },
     initial: "initial",
     states: {
@@ -85,11 +104,12 @@ const parent = createMachine(
                   ...PacmanMachine.context,
                   maze: ctx.maze,
                   position: {
-                    row: 3,
-                    col: 3,
+                    row: 26,
+                    col: 13,
                     rowOffset: 4,
                     colOffset: 3,
                   },
+                  direction: "left",
                 }),
                 "pacman"
               ),
@@ -199,9 +219,14 @@ const parent = createMachine(
         initial: "getReady",
         states: {
           getReady: {
+            tags: ["getReady"],
             after: {
               1000: {
+                actions: ["notifyGhostsGetReady"],
+              },
+              4000: {
                 target: "playing",
+                actions: ["notifyAllStart"],
               },
             },
           },
@@ -267,7 +292,7 @@ const parent = createMachine(
                   checkCollisions: {
                     entry: [
                       pure((ctx) => {
-                        const { pacman, ghosts } = ctx;
+                        const { pacman, ghosts, deadGhosts } = ctx;
                         const checkCollision = (a, b) => {
                           if (
                             a.position.row === b.position.row &&
@@ -276,9 +301,11 @@ const parent = createMachine(
                             return true;
                           }
                         };
-
+                        const aliveGhosts = Object.keys(ghosts).filter(
+                          (ghostId) => !deadGhosts.includes(ghostId)
+                        );
                         let ghostsCollidedWith = [];
-                        Object.keys(ghosts).forEach((ghostName) => {
+                        aliveGhosts.forEach((ghostName) => {
                           if (checkCollision(pacman, ghosts[ghostName])) {
                             ghostsCollidedWith.push(ghostName);
                           }
@@ -311,6 +338,7 @@ const parent = createMachine(
                             "clearWaitingFor",
                             "pauseCharacters",
                             "notifyGhostsDead",
+                            "updateDeadGhosts",
                           ],
                         },
                       ],
@@ -324,7 +352,11 @@ const parent = createMachine(
                       {
                         cond: "pacmanIsEatingPellet",
                         target: "checkWinCondition",
-                        actions: ["setTileToEmpty", "notifyPacmanPellet"],
+                        actions: [
+                          "setTileToEmpty",
+                          "notifyPacmanPellet",
+                          { type: "awardPoints", points: getPoints("pellet") },
+                        ],
                       },
                       {
                         cond: "pacmanIsEatingPowerPellet",
@@ -332,6 +364,10 @@ const parent = createMachine(
                         actions: [
                           "setTileToEmpty",
                           "notifyPacmanPowerPellet",
+                          {
+                            type: "awardPoints",
+                            points: getPoints("powerPellet"),
+                          },
                           "sendGameFrightenedMode",
                         ],
                       },
@@ -359,7 +395,7 @@ const parent = createMachine(
                   src: () => (callback) => {
                     const interval = setInterval(() => {
                       callback("TICK");
-                    }, 100);
+                    }, 1000 / 40);
 
                     return () => {
                       clearInterval(interval);
@@ -414,19 +450,44 @@ const parent = createMachine(
                   },
                   frightened: {
                     id: "frightened",
-                    invoke: {
-                      id: "frightenedModeTimer",
-                      src: (ctx) => (callback) => {
-                        const interval = setInterval(() => {
-                          callback("END_FRIGHTENED_MODE");
-                        }, ctx.gameConfig.frightenedModeDuration * 1000);
-                        return () => {
-                          clearInterval(interval);
-                        };
+                    initial: "frightStarted",
+                    states: {
+                      frightStarted: {
+                        invoke: {
+                          id: "frightenedModeTimer",
+                          src: (ctx) => (callback) => {
+                            const interval = setInterval(() => {
+                              callback("FRIGHT_ENDING_SOON");
+                            }, ctx.gameConfig.frightenedModeStartDuration * 1000);
+                            return () => {
+                              clearInterval(interval);
+                            };
+                          },
+                        },
+                        on: {
+                          FRIGHT_ENDING_SOON: {
+                            target: "frightEnding",
+                            actions: ["notifyFrightEndingSoon"],
+                          },
+                        },
+                      },
+                      frightEnding: {
+                        invoke: {
+                          id: "frightenedModeTimer",
+                          src: (ctx) => (callback) => {
+                            const interval = setInterval(() => {
+                              callback("END_FRIGHTENED_MODE");
+                            }, ctx.gameConfig.frightenedModeEndingDuration * 1000);
+                            return () => {
+                              clearInterval(interval);
+                            };
+                          },
+                        },
                       },
                     },
                     on: {
                       FRIGHTENED: {
+                        // pacman could eat another power pellet
                         // exit the state to cancel the callback
                         // otherwise the END event would still happen
                         target: "frightened",
@@ -524,6 +585,10 @@ const parent = createMachine(
           )
         );
       }),
+      awardPoints: assign({
+        totalPoints: (ctx, event, { action }) =>
+          ctx.totalPoints + action.points,
+      }),
 
       clearWaitingFor: assign({ waitingForResponse: [] }),
       removeFromWaitlist: assign({
@@ -556,6 +621,11 @@ const parent = createMachine(
           };
         }
       }),
+      updateDeadGhosts: assign({
+        deadGhosts: (ctx, event) => {
+          return [...ctx.deadGhosts, ...event.ghosts];
+        },
+      }),
       setTileToEmpty: assign({
         maze: (ctx) => {
           const { pacman, maze } = ctx;
@@ -580,6 +650,16 @@ const parent = createMachine(
           )
         );
       }),
+      notifyAllStart: pure((ctx) => {
+        return ["pacman", ...Object.keys(ctx.ghosts)].map((character) =>
+          send(
+            {
+              type: "START",
+            },
+            { to: character }
+          )
+        );
+      }),
       notifyGhostsDead: pure((ctx, event) => {
         return event.ghosts.map((ghost) =>
           send(
@@ -587,6 +667,16 @@ const parent = createMachine(
               type: "DIED",
             },
             { to: ghost }
+          )
+        );
+      }),
+      notifyGhostsGetReady: pure((ctx) => {
+        return [...Object.keys(ctx.ghosts)].map((character) =>
+          send(
+            {
+              type: "GET_READY",
+            },
+            { to: character }
           )
         );
       }),
@@ -611,11 +701,20 @@ const parent = createMachine(
         );
       }),
       notifyFrightenedMode: pure((ctx) => {
-        console.log("NOTIFY");
         return ["pacman", ...Object.keys(ctx.ghosts)].map((character) =>
           send(
             {
               type: "FRIGHTENED",
+            },
+            { to: character }
+          )
+        );
+      }),
+      notifyFrightEndingSoon: pure((ctx) => {
+        return ["pacman", ...Object.keys(ctx.ghosts)].map((character) =>
+          send(
+            {
+              type: "FRIGHT_ENDING_SOON",
             },
             { to: character }
           )
