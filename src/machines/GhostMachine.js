@@ -158,7 +158,6 @@ const GhostMachine = createMachine(
         on: {
           GET_READY: {
             target: "ready",
-            actions: [() => console.log("get ready")],
           },
         },
       },
@@ -172,7 +171,6 @@ const GhostMachine = createMachine(
       },
       playing: {
         type: "parallel",
-
         states: {
           // in the maze there are certain zones that affect the ghosts behaviour
           restrictedZones: {
@@ -270,6 +268,7 @@ const GhostMachine = createMachine(
                 ],
               },
               paused: {
+                tags: ["movementPaused"],
                 on: {
                   RESUME: {
                     target: "idle",
@@ -384,6 +383,10 @@ const GhostMachine = createMachine(
                   },
                   DIED: {
                     target: "dead",
+                  },
+                  FRIGHTENED: {
+                    target: "frightened",
+                    internal: false,
                   },
                 },
               },

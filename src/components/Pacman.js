@@ -30,6 +30,10 @@ const Pacman = React.memo((props) => {
     return null;
   }
 
+  if (state.hasTag("frightPaused")) {
+    return null;
+  }
+
   const showEating = state.hasTag("playing") && !state.hasTag("walled");
   const showDying = state.hasTag("dying");
 
@@ -51,7 +55,7 @@ const Pacman = React.memo((props) => {
   }
   return (
     <g
-      transform={`translate(${position.col * tileSize + position.colOffset}
+      transform={`translate(${position.col * tileSize + position.colOffset + 1}
     ${position.row * tileSize + position.rowOffset}) rotate(${
         mapDirectionToRotation[direction]
       }) scale (0.75 0.75)`}

@@ -19,6 +19,10 @@
   opacity: 0;
 }
 
+.pauseAnimation {
+  animation-play-state: paused;
+}
+
 @keyframes movingOne {
   0% {
     opacity: 1;

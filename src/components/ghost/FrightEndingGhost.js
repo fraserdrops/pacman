@@ -4,21 +4,40 @@ import frightEndingStyles from "./FrightEndingGhost.module.css";
 import { makeSquiggle } from "./util";
 
 const FrightEndingGhost = React.memo((props) => {
+  const { paused } = props;
   return (
     <g>
-      <g className={frightEndingStyles.ghostBody}>
+      <g
+        className={
+          frightEndingStyles.ghostBody +
+          ` ${paused ? styles.pauseAnimation : ""}`
+        }
+      >
         <g>
           <path d="M0, 6 a6,6 0 0 1 12,0 v4 h -12 z" />
         </g>
-        <g className={styles.shapeOne}>
+        <g
+          className={
+            styles.shapeOne + ` ${paused ? styles.pauseAnimation : ""}`
+          }
+        >
           <path d="M12, 10 v1.7 L 10.5 10 L 8.5 12.2 L 7.5 12.2 L 7.5 10.2 L 6 10.2 L 4.5 10.2 L 4.5 12.2 L 3.5 12.2 L 1.5 10 L 0 11.7 L 0 10" />
         </g>
-        <g className={styles.shapeTwo}>
+        <g
+          className={
+            styles.shapeTwo + ` ${paused ? styles.pauseAnimation : ""}`
+          }
+        >
           <path d="M12, 10 v1  L 11 12 L 9.75 11    L 8.5 10 L 7.25 11    L 6 12   L 4.75 11  L 3.5 10   L 2.25 11  L 1 12   L 0, 11 L 0 10" />
         </g>
       </g>
 
-      <g className={frightEndingStyles.ghostFace}>
+      <g
+        className={
+          frightEndingStyles.ghostFace +
+          ` ${paused ? styles.pauseAnimation : ""}`
+        }
+      >
         <g transform={`translate(4, 5)`}>
           <ellipse rx="1" ry="1" />
         </g>

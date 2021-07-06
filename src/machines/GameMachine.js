@@ -2,14 +2,18 @@ import { createMachine, spawn, assign, send, actions } from "xstate";
 import PacmanMachine from "./PacmanMachine";
 import GhostMachine from "./GhostMachine";
 import { maze1, getTileType, setTileType } from "../shared/maze";
+import IntervalMachine from "./IntervalMachine";
 
-const { pure } = actions;
+const { pure, choose } = actions;
 const GHOST_HOUSE_ROW = 17;
 const GHOST_HOUSE_LEFT_COL = 12;
 const GHOST_HOUSE_MIDDLE_COL = 13;
 const GHOST_HOUSE_RIGHT_COL = 14;
 const CENTER_COL_OFFSET = 3;
 const CENTER_ROW_OFFSET = 4;
+
+const FRUIT_DROP_ROW = 12;
+const FRUIT_DROP_COL = 12;
 
 const createGameStateForCharacters = (ctx) => {
   const gameState = {
@@ -89,9 +93,12 @@ const parent = createMachine(
       gameConfig: {
         frightenedModeStartDuration: 5,
         frightenedModeEndingDuration: 5,
+        pelletsFirstFruit: 7,
+        pelletsSecondFruit: 170,
       },
       totalPoints: 0,
       ghostsEaten: 0,
+      pelletsEaten: 0,
     },
     initial: "initial",
     states: {
@@ -107,7 +114,7 @@ const parent = createMachine(
                     row: 26,
                     col: 13,
                     rowOffset: 4,
-                    colOffset: 3,
+                    colOffset: 7,
                   },
                   direction: "left",
                 }),
@@ -245,9 +252,6 @@ const parent = createMachine(
               DOWN_ARROW: {
                 actions: [send({ type: "DOWN" }, { to: "pacman" })],
               },
-              PAUSE: {
-                target: "paused",
-              },
               GAME_OVER: {
                 target: "gameOver",
               },
@@ -256,6 +260,43 @@ const parent = createMachine(
               },
             },
             states: {
+              fruit: {
+                states: {
+                  noFruit: {
+                    on: {
+                      PELLET_EATEN: [
+                        {
+                          cond: "shouldDropFirstFruit",
+                          target: "fruitActive",
+                          actions: ["dropFruit"],
+                        },
+                      ],
+                    },
+                  },
+                  fruitActive: {
+                    invoke: {
+                      src: IntervalMachine.withContext({
+                        intervals: [
+                          {
+                            eventType: "REMOVE_FRUIT",
+                            seconds: 9 + Math.random(), //
+                          },
+                        ],
+                      }),
+                    },
+                    on: {
+                      FRUIT_EATEN: {
+                        target: "noFruit",
+                      },
+                      REMOVE_FRUIT: {
+                        target: "noFruit",
+                        actions: ["removeFruit"],
+                      },
+                    },
+                  },
+                },
+              },
+              ghostRelease: {},
               loop: {
                 initial: "waiting",
                 states: {
@@ -326,24 +367,11 @@ const parent = createMachine(
                       }),
                     ],
                     on: {
-                      GHOST_COLLISION: [
-                        {
-                          in: "#normalChaseMode",
-                          target: "#lostLife",
-                          actions: ["pauseCharacters"],
-                        },
-                        {
-                          target: "#ghostDied",
-                          actions: [
-                            "clearWaitingFor",
-                            "pauseCharacters",
-                            "notifyGhostsDead",
-                            "updateDeadGhosts",
-                          ],
-                        },
-                      ],
                       NO_GHOST_COLLISIONS: {
                         target: "checkDotConsumption",
+                      },
+                      GHOST_COLLISION: {
+                        target: "waiting",
                       },
                     },
                   },
@@ -354,8 +382,10 @@ const parent = createMachine(
                         target: "checkWinCondition",
                         actions: [
                           "setTileToEmpty",
+                          "incrementPelletsEaten",
                           "notifyPacmanPellet",
                           { type: "awardPoints", points: getPoints("pellet") },
+                          send("PELLET_EATEN"),
                         ],
                       },
                       {
@@ -369,6 +399,17 @@ const parent = createMachine(
                             points: getPoints("powerPellet"),
                           },
                           "sendGameFrightenedMode",
+                        ],
+                      },
+                      {
+                        cond: "pacmanIsEatingFruit",
+                        target: "checkWinCondition",
+                        actions: [
+                          "setTileToEmpty",
+                          {
+                            type: "awardPoints",
+                            points: getPoints("fruit"),
+                          },
                         ],
                       },
                       {
@@ -405,28 +446,32 @@ const parent = createMachine(
               },
               chaseMode: {
                 initial: "normal",
+                invoke: {
+                  id: "scatterChaseTimer",
+                  src: IntervalMachine.withContext({
+                    ...IntervalMachine.context,
+                    intervals: [
+                      { eventType: "CHASE", seconds: 2 },
+                      { eventType: "SCATTER", seconds: 5 },
+                      { eventType: "CHASE", seconds: 5 },
+                    ],
+                  }),
+                },
                 states: {
                   normal: {
                     id: "normalChaseMode",
                     initial: "scatter",
-                    invoke: {
-                      id: "chaseModeTimer",
-                      src: () => (callback) => {
-                        const chaseScatterMode = [
-                          { mode: "CHASE", startTime: 2 },
-                          { mode: "SCATTER", startTime: 5 },
-                        ];
-                        chaseScatterMode.forEach((period) => {
-                          setTimeout(() => {
-                            callback(period.mode);
-                          }, period.startTime * 1000);
-                        });
-                      },
-                    },
                     on: {
                       FRIGHTENED: {
                         target: "frightened",
-                        actions: ["notifyFrightenedMode"],
+                        actions: [
+                          "notifyFrightenedMode",
+                          "pauseScatterChaseTimer",
+                        ],
+                      },
+                      GHOST_COLLISION: {
+                        target: "#lostLife",
+                        actions: ["pauseCharacters"],
                       },
                     },
                     states: {
@@ -434,7 +479,10 @@ const parent = createMachine(
                         on: {
                           CHASE: {
                             target: "chase",
-                            actions: ["notifyChaseMode"],
+                            actions: [
+                              "notifyChaseMode",
+                              () => console.log("cahseks"),
+                            ],
                           },
                         },
                       },
@@ -442,7 +490,10 @@ const parent = createMachine(
                         on: {
                           SCATTER: {
                             target: "scatter",
-                            actions: ["notifyScatterMode"],
+                            actions: [
+                              "notifyScatterMode",
+                              () => console.log("scatter"),
+                            ],
                           },
                         },
                       },
@@ -450,37 +501,45 @@ const parent = createMachine(
                   },
                   frightened: {
                     id: "frightened",
-                    initial: "frightStarted",
+                    initial: "playing",
+                    invoke: {
+                      id: "frightenedModeTimer",
+                      src: IntervalMachine.withContext({
+                        ...IntervalMachine.context,
+                        intervals: [
+                          { eventType: "FRIGHT_ENDING_SOON", seconds: 5 },
+                          { eventType: "END_FRIGHTENED_MODE", seconds: 5 },
+                        ],
+                      }),
+                    },
                     states: {
-                      frightStarted: {
-                        invoke: {
-                          id: "frightenedModeTimer",
-                          src: (ctx) => (callback) => {
-                            const interval = setInterval(() => {
-                              callback("FRIGHT_ENDING_SOON");
-                            }, ctx.gameConfig.frightenedModeStartDuration * 1000);
-                            return () => {
-                              clearInterval(interval);
-                            };
-                          },
-                        },
+                      playing: {
                         on: {
-                          FRIGHT_ENDING_SOON: {
-                            target: "frightEnding",
-                            actions: ["notifyFrightEndingSoon"],
+                          GHOST_COLLISION: {
+                            target: "paused",
+                            actions: [
+                              "clearWaitingFor",
+                              "pauseCharacters",
+                              "notifyGhostsDead",
+                              "updateDeadGhosts",
+                              "updateGhostsEatenCount",
+                              "pauseFrightenedTimer",
+                              () => console.log("ghost collision"),
+                            ],
                           },
                         },
                       },
-                      frightEnding: {
+                      paused: {
                         invoke: {
-                          id: "frightenedModeTimer",
-                          src: (ctx) => (callback) => {
-                            const interval = setInterval(() => {
-                              callback("END_FRIGHTENED_MODE");
-                            }, ctx.gameConfig.frightenedModeEndingDuration * 1000);
-                            return () => {
-                              clearInterval(interval);
-                            };
+                          src: IntervalMachine.withContext({
+                            ...IntervalMachine.context,
+                            intervals: [{ eventType: "RESUME", seconds: 2 }],
+                          }),
+                        },
+                        on: {
+                          RESUME: {
+                            target: "playing",
+                            actions: ["resumeFrightenedTimer", "notifyResume"],
                           },
                         },
                       },
@@ -491,12 +550,22 @@ const parent = createMachine(
                         // exit the state to cancel the callback
                         // otherwise the END event would still happen
                         target: "frightened",
+                        internal: false,
+                        actions: ["notifyFrightenedMode"],
+                      },
+
+                      FRIGHT_ENDING_SOON: {
+                        actions: ["notifyFrightEndingSoon"],
                       },
                       END_FRIGHTENED_MODE: {
                         target: "normal",
-                        actions: ["notifyEndFrightenedMode"],
+                        actions: [
+                          "notifyEndFrightenedMode",
+                          "resumeScatterChaseTimer",
+                        ],
                       },
                     },
+                    exit: ["clearGhostsEeatenCount"],
                   },
                 },
               },
@@ -528,22 +597,6 @@ const parent = createMachine(
             },
             onDone: {
               target: "getReady",
-            },
-          },
-          ghostDied: {
-            id: "ghostDied",
-            after: {
-              2000: {
-                actions: ["notifyResume"],
-                target: "playing",
-              },
-            },
-          },
-          paused: {
-            on: {
-              PLAY: {
-                target: "playing",
-              },
             },
           },
           gameOver: {
@@ -589,11 +642,53 @@ const parent = createMachine(
         totalPoints: (ctx, event, { action }) =>
           ctx.totalPoints + action.points,
       }),
-
+      dropFruit: assign({
+        maze: (ctx) => {
+          const { maze } = ctx;
+          const updatedMaze = { ...maze };
+          setTileType(
+            updatedMaze.tiles,
+            { row: FRUIT_DROP_ROW, col: FRUIT_DROP_COL },
+            "fruit"
+          );
+          return updatedMaze;
+        },
+      }),
+      removeFruit: assign({
+        maze: (ctx) => {
+          const { maze } = ctx;
+          const updatedMaze = { ...maze };
+          setTileType(
+            updatedMaze.tiles,
+            { row: FRUIT_DROP_ROW, col: FRUIT_DROP_COL },
+            "empty"
+          );
+          return updatedMaze;
+        },
+      }),
+      pauseScatterChaseTimer: send(
+        { type: "PAUSE" },
+        { to: "scatterChaseTimer" }
+      ),
+      resumeScatterChaseTimer: send(
+        { type: "RESUME" },
+        { to: "scatterChaseTimer" }
+      ),
+      pauseFrightenedTimer: send(
+        { type: "PAUSE" },
+        { to: "frightenedModeTimer" }
+      ),
+      resumeFrightenedTimer: send(
+        { type: "RESUME" },
+        { to: "frightenedModeTimer" }
+      ),
       clearWaitingFor: assign({ waitingForResponse: [] }),
       removeFromWaitlist: assign({
         waitingForResponse: (ctx, event) =>
           ctx.waitingForResponse.filter((item) => item !== event.character),
+      }),
+      incrementPelletsEaten: assign({
+        pelletsEaten: (ctx) => ctx.pelletsEaten + 1,
       }),
       updatePosition: assign((ctx, event) => {
         if (event.character === "pacman") {
@@ -620,6 +715,12 @@ const parent = createMachine(
             },
           };
         }
+      }),
+      updateGhostsEatenCount: assign({
+        ghostsEaten: (ctx) => ctx.ghostsEaten + 1,
+      }),
+      clearGhostsEeatenCount: assign({
+        ghostsEaten: 0,
       }),
       updateDeadGhosts: assign({
         deadGhosts: (ctx, event) => {
@@ -775,6 +876,12 @@ const parent = createMachine(
         const tileType = getTileType(maze.tiles, position);
         return tileType === "pellet";
       },
+      pacmanIsEatingFruit: (ctx) => {
+        const { pacman, maze } = ctx;
+        const { position } = pacman;
+        const tileType = getTileType(maze.tiles, position);
+        return tileType === "fruit";
+      },
       pacmanIsEatingPowerPellet: (ctx) => {
         const { pacman, maze } = ctx;
         const { position } = pacman;
@@ -782,6 +889,10 @@ const parent = createMachine(
         return tileType === "powerPellet";
       },
       eatenAllPellets: (ctx) => ctx.pelletsRemaining === 0,
+      shouldDropFirstFruit: (ctx) =>
+        ctx.pelletsEaten === ctx.pelletsFirstFruit - 1,
+      shouldDropSecondFruit: (ctx) =>
+        ctx.pelletsEaten === ctx.pelletsSecondFruit - 1,
     },
   }
 );

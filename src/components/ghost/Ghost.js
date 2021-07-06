@@ -30,6 +30,7 @@ const Ghost = React.memo((props) => {
           position={position}
           direction={direction}
           tileSize={tileSize}
+          paused={state.hasTag("movementPaused")}
         />
       )}
       {state.hasTag("frightStarted") && (
@@ -38,6 +39,7 @@ const Ghost = React.memo((props) => {
           position={position}
           direction={direction}
           tileSize={tileSize}
+          paused={state.hasTag("movementPaused")}
         />
       )}
       {state.hasTag("frightEnding") && (
@@ -46,6 +48,7 @@ const Ghost = React.memo((props) => {
           position={position}
           direction={direction}
           tileSize={tileSize}
+          paused={state.hasTag("movementPaused")}
         />
       )}
       {state.hasTag("hidden") && (

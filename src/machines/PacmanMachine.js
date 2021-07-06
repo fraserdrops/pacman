@@ -163,7 +163,7 @@ const PacmanMachine = createMachine(
       maze: [],
       framesToSkip: 0,
       config: {
-        baseSpeed: 35,
+        baseSpeed: 50,
         speedPercentage: {
           frightened: 0.8,
           normal: 0.9,
@@ -171,7 +171,12 @@ const PacmanMachine = createMachine(
       },
     },
     on: {
-      GAME_SYNC: { actions: ["respondWithUpdatedPosition"] },
+      GAME_SYNC: {
+        actions: [
+          "respondWithUpdatedPosition",
+          () => console.log("updatePosition"),
+        ],
+      },
     },
     states: {
       ready: {
@@ -197,26 +202,11 @@ const PacmanMachine = createMachine(
           RIGHT: {
             actions: [{ type: "requestDirection", direction: "right" }],
           },
-          PAUSE: {
-            target: "paused",
-          },
         },
         states: {
           movement: {
             id: "movement",
             initial: "normalMovement",
-            invoke: {
-              id: "tick",
-              src: () => (callback) => {
-                const interval = setInterval(() => {
-                  callback("TICK");
-                }, 100);
-
-                return () => {
-                  clearInterval(interval);
-                };
-              },
-            },
             states: {
               normalMovement: {
                 id: "normalMovement",
@@ -438,25 +428,43 @@ const PacmanMachine = createMachine(
                 },
               },
               frightened: {
+                initial: "playing",
                 on: {
                   END_FRIGHT: {
                     target: "regular",
                   },
                 },
-                invoke: {
-                  id: "tick",
-                  src: (ctx) => (callback) => {
-                    const updateRate =
-                      1000 /
-                      (ctx.config.speedPercentage.frightened *
-                        ctx.config.baseSpeed);
-                    const interval = setInterval(() => {
-                      callback("TICK");
-                    }, updateRate);
+                states: {
+                  playing: {
+                    invoke: {
+                      id: "tick",
+                      src: (ctx) => (callback) => {
+                        const updateRate =
+                          1000 /
+                          (ctx.config.speedPercentage.frightened *
+                            ctx.config.baseSpeed);
+                        const interval = setInterval(() => {
+                          callback("TICK");
+                        }, updateRate);
 
-                    return () => {
-                      clearInterval(interval);
-                    };
+                        return () => {
+                          clearInterval(interval);
+                        };
+                      },
+                    },
+                    on: {
+                      PAUSE: {
+                        target: "paused",
+                      },
+                    },
+                  },
+                  paused: {
+                    tags: ["frightPaused"],
+                    on: {
+                      RESUME: {
+                        target: "playing",
+                      },
+                    },
                   },
                 },
               },

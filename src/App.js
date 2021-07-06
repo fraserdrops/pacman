@@ -5,6 +5,7 @@ import Maze from "./components/Maze";
 import Pacman from "./components/Pacman";
 import Ghost from "./components/ghost/Ghost";
 import GameMachine from "./machines/GameMachine";
+import { inspect } from "@xstate/inspect";
 
 // inspect({
 //   // url: "https://actorviz.fraser.space",
@@ -30,7 +31,7 @@ const selectGetReady = (state) => state.hasTag("getReady");
 
 function App() {
   // const [state, send] = useMachine(GameMachine, { devTools: true });
-  const service = useInterpret(GameMachine);
+  const service = useInterpret(GameMachine, { devTools: "true" });
   const pacman = useSelector(service, selectPacman);
   // const pacman = useInterpret(testPacman);
   const ghosts = useSelector(service, selectGhosts);

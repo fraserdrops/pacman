@@ -3,7 +3,7 @@ import styles from "./Ghost.module.css";
 import { getEyePositionFromDirection } from "./util";
 
 const NormalGhost = React.memo((props) => {
-  const { direction, color } = props;
+  const { direction, color, paused } = props;
   let ghostColor = color;
 
   const { leftEye, rightEye, pupilOffset } =
@@ -17,14 +17,18 @@ const NormalGhost = React.memo((props) => {
           stroke={ghostColor}
         />
       </g>
-      <g className={styles.shapeOne}>
+      <g
+        className={styles.shapeOne + ` ${paused ? styles.pauseAnimation : ""}`}
+      >
         <path
           d="M12, 10 v1.7 L 10.5 10 L 8.5 12.2 L 7.5 12.2 L 7.5 10.2 L 6 10.2 L 4.5 10.2 L 4.5 12.2 L 3.5 12.2 L 1.5 10 L 0 11.7 L 0 10"
           fill={ghostColor}
           stroke={ghostColor}
         />
       </g>
-      <g className={styles.shapeTwo}>
+      <g
+        className={styles.shapeTwo + ` ${paused ? styles.pauseAnimation : ""}`}
+      >
         <path
           d="M12, 10 v1  L 11 12 L 9.75 11    L 8.5 10 L 7.25 11    L 6 12   L 4.75 11  L 3.5 10   L 2.25 11  L 1 12   L 0, 11 L 0 10"
           fill={ghostColor}
