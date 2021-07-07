@@ -95,7 +95,7 @@ const parent = createMachine(
         frightenedModeStartDuration: 5,
         frightenedModeEndingDuration: 5,
         pelletsFirstFruit: 12,
-        pelletsSecondFruit: 170,
+        pelletsSecondFruit: 50,
       },
       totalPoints: 0,
       ghostsEaten: 0,
@@ -269,6 +269,11 @@ const parent = createMachine(
                       PELLET_EATEN: [
                         {
                           cond: "shouldDropFirstFruit",
+                          target: "fruitActive",
+                          actions: ["dropFruit"],
+                        },
+                        {
+                          cond: "shouldDropSecondFruit",
                           target: "fruitActive",
                           actions: ["dropFruit"],
                         },
