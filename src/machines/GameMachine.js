@@ -1,8 +1,9 @@
-import { createMachine, spawn, assign, send, actions } from "xstate";
+import { createMachine, spawn, assign, send, actions, forwardTo } from "xstate";
 import PacmanMachine from "./PacmanMachine";
 import GhostMachine from "./GhostMachine";
 import { maze1, getTileType, setTileType } from "../shared/maze";
 import IntervalMachine from "./IntervalMachine";
+import Fruit from "./FruitMachine";
 
 const { pure, choose } = actions;
 const GHOST_HOUSE_ROW = 17;
@@ -12,8 +13,8 @@ const GHOST_HOUSE_RIGHT_COL = 14;
 const CENTER_COL_OFFSET = 3;
 const CENTER_ROW_OFFSET = 4;
 
-const FRUIT_DROP_ROW = 12;
-const FRUIT_DROP_COL = 12;
+const FRUIT_DROP_ROW = 20;
+const FRUIT_DROP_COL = 13;
 
 const createGameStateForCharacters = (ctx) => {
   const gameState = {
@@ -93,7 +94,7 @@ const parent = createMachine(
       gameConfig: {
         frightenedModeStartDuration: 5,
         frightenedModeEndingDuration: 5,
-        pelletsFirstFruit: 7,
+        pelletsFirstFruit: 12,
         pelletsSecondFruit: 170,
       },
       totalPoints: 0,
@@ -261,6 +262,7 @@ const parent = createMachine(
             },
             states: {
               fruit: {
+                initial: "noFruit",
                 states: {
                   noFruit: {
                     on: {
@@ -274,6 +276,11 @@ const parent = createMachine(
                     },
                   },
                   fruitActive: {
+                    initial: "ripe",
+                    states: {
+                      ripe: {},
+                      rotten: {},
+                    },
                     invoke: {
                       src: IntervalMachine.withContext({
                         intervals: [
@@ -286,11 +293,32 @@ const parent = createMachine(
                     },
                     on: {
                       FRUIT_EATEN: {
-                        target: "noFruit",
+                        target: "fruitInactive",
+                        actions: [
+                          forwardTo("fruit"),
+                          {
+                            type: "awardPoints",
+                            points: getPoints("fruit"),
+                          },
+                        ],
                       },
                       REMOVE_FRUIT: {
                         target: "noFruit",
-                        actions: ["removeFruit"],
+                        actions: [
+                          "removeFruit",
+                          () => console.log("REMOJEOSR"),
+                        ],
+                      },
+                    },
+                  },
+                  fruitInactive: {
+                    on: {
+                      REMOVE_FRUIT: {
+                        target: "noFruit",
+                        actions: [
+                          "removeFruit",
+                          () => console.log("REMOJEOSR"),
+                        ],
                       },
                     },
                   },
@@ -404,13 +432,7 @@ const parent = createMachine(
                       {
                         cond: "pacmanIsEatingFruit",
                         target: "checkWinCondition",
-                        actions: [
-                          "setTileToEmpty",
-                          {
-                            type: "awardPoints",
-                            points: getPoints("fruit"),
-                          },
-                        ],
+                        actions: [send("FRUIT_EATEN")],
                       },
                       {
                         // technically the game can't finish unless Pacman eats the final pellet
@@ -479,10 +501,7 @@ const parent = createMachine(
                         on: {
                           CHASE: {
                             target: "chase",
-                            actions: [
-                              "notifyChaseMode",
-                              () => console.log("cahseks"),
-                            ],
+                            actions: ["notifyChaseMode"],
                           },
                         },
                       },
@@ -490,10 +509,7 @@ const parent = createMachine(
                         on: {
                           SCATTER: {
                             target: "scatter",
-                            actions: [
-                              "notifyScatterMode",
-                              () => console.log("scatter"),
-                            ],
+                            actions: ["notifyScatterMode"],
                           },
                         },
                       },
@@ -524,7 +540,6 @@ const parent = createMachine(
                               "updateDeadGhosts",
                               "updateGhostsEatenCount",
                               "pauseFrightenedTimer",
-                              () => console.log("ghost collision"),
                             ],
                           },
                         },
@@ -642,28 +657,49 @@ const parent = createMachine(
         totalPoints: (ctx, event, { action }) =>
           ctx.totalPoints + action.points,
       }),
+      // dropFruit: assign({
+      //   maze: (ctx) => {
+      //     const { maze } = ctx;
+      //     const updatedMaze = { ...maze };
+      //     setTileType(
+      //       updatedMaze.tiles,
+      //       { row: FRUIT_DROP_ROW, col: FRUIT_DROP_COL },
+      //       "fruit"
+      //     );
+      //     return updatedMaze;
+      //   },
+      // }),
+      // removeFruit: assign({
+      //   maze: (ctx) => {
+      //     const { maze } = ctx;
+      //     const updatedMaze = { ...maze };
+      //     setTileType(
+      //       updatedMaze.tiles,
+      //       { row: FRUIT_DROP_ROW, col: FRUIT_DROP_COL },
+      //       "empty"
+      //     );
+      //     return updatedMaze;
+      //   },
+      // }),
       dropFruit: assign({
-        maze: (ctx) => {
-          const { maze } = ctx;
-          const updatedMaze = { ...maze };
-          setTileType(
-            updatedMaze.tiles,
-            { row: FRUIT_DROP_ROW, col: FRUIT_DROP_COL },
+        fruit: () => ({
+          type: "orange",
+          value: getPoints("fruit"),
+          position: { row: FRUIT_DROP_ROW, col: FRUIT_DROP_COL },
+          ref: spawn(
+            Fruit.withContext({
+              type: "orange",
+              value: getPoints("fruit"),
+              position: { row: FRUIT_DROP_ROW, col: FRUIT_DROP_COL },
+            }),
             "fruit"
-          );
-          return updatedMaze;
-        },
+          ),
+        }),
       }),
       removeFruit: assign({
-        maze: (ctx) => {
-          const { maze } = ctx;
-          const updatedMaze = { ...maze };
-          setTileType(
-            updatedMaze.tiles,
-            { row: FRUIT_DROP_ROW, col: FRUIT_DROP_COL },
-            "empty"
-          );
-          return updatedMaze;
+        fruit: (ctx) => {
+          ctx.fruit.ref.stop();
+          return undefined;
         },
       }),
       pauseScatterChaseTimer: send(
@@ -877,10 +913,14 @@ const parent = createMachine(
         return tileType === "pellet";
       },
       pacmanIsEatingFruit: (ctx) => {
-        const { pacman, maze } = ctx;
-        const { position } = pacman;
-        const tileType = getTileType(maze.tiles, position);
-        return tileType === "fruit";
+        const { fruit, pacman } = ctx;
+        if (!fruit) {
+          return false;
+        }
+        return (
+          fruit.position.row === pacman.position.row &&
+          fruit.position.col === pacman.position.col
+        );
       },
       pacmanIsEatingPowerPellet: (ctx) => {
         const { pacman, maze } = ctx;
@@ -889,10 +929,11 @@ const parent = createMachine(
         return tileType === "powerPellet";
       },
       eatenAllPellets: (ctx) => ctx.pelletsRemaining === 0,
-      shouldDropFirstFruit: (ctx) =>
-        ctx.pelletsEaten === ctx.pelletsFirstFruit - 1,
+      shouldDropFirstFruit: (ctx) => {
+        return ctx.pelletsEaten === ctx.gameConfig.pelletsFirstFruit - 1;
+      },
       shouldDropSecondFruit: (ctx) =>
-        ctx.pelletsEaten === ctx.pelletsSecondFruit - 1,
+        ctx.pelletsEaten === ctx.gameConfig.pelletsSecondFruit - 1,
     },
   }
 );

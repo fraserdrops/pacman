@@ -6,6 +6,7 @@ import Pacman from "./components/Pacman";
 import Ghost from "./components/ghost/Ghost";
 import GameMachine from "./machines/GameMachine";
 import { inspect } from "@xstate/inspect";
+import { Fruit } from "./components/Fruit";
 
 // inspect({
 //   // url: "https://actorviz.fraser.space",
@@ -26,6 +27,7 @@ const selectPacman = (state) => state.context.pacman;
 const selectPosition = (state) => state.context.pacman.position;
 const selectGhosts = (state) => state.context.ghosts;
 const selectPoints = (state) => state.context.totalPoints;
+const selectFruit = (state) => state.context.fruit;
 const selectMaze = (state) => state.context.maze;
 const selectGetReady = (state) => state.hasTag("getReady");
 
@@ -37,6 +39,7 @@ function App() {
   const ghosts = useSelector(service, selectGhosts);
   const maze = useSelector(service, selectMaze);
   const points = useSelector(service, selectPoints);
+  const fruit = useSelector(service, selectFruit);
   const getReady = useSelector(service, selectGetReady);
 
   useEffect(() => {
@@ -83,7 +86,7 @@ function App() {
         }}
       >
         <Maze maze={maze} tileSize={tileSize} />
-
+        {fruit && <Fruit actorRef={fruit.ref} tileSize={tileSize} />}
         <Pacman actorRef={pacman.ref} tileSize={tileSize} />
         {Object.keys(ghosts).map((ghostId) => {
           return (

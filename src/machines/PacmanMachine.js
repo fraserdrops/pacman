@@ -153,9 +153,9 @@ const PacmanMachine = createMachine(
         rowOffset: 4,
         colOffset: 4,
       },
-      direction: "down",
+      direction: "left",
       corneringDirections: {},
-      requestedDirection: "down",
+      requestedDirection: "left",
       nextPosition: {},
       speed: {},
       vals: [],
@@ -172,10 +172,7 @@ const PacmanMachine = createMachine(
     },
     on: {
       GAME_SYNC: {
-        actions: [
-          "respondWithUpdatedPosition",
-          () => console.log("updatePosition"),
-        ],
+        actions: ["respondWithUpdatedPosition"],
       },
     },
     states: {

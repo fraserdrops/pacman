@@ -4,8 +4,8 @@ import { getTileComponent } from "./tiles/getTileComponent";
 const getColorForType = (type) => {
   const mapColorToType = {
     wall: "blue",
-    pellet: "green",
-    powerPellet: "green",
+    pellet: "#fbe9e7",
+    powerPellet: "#ffccbc",
     houseEntrance: "pink",
   };
 

@@ -1,0 +1,25 @@
+.powerPellet {
+  animation-duration: 300ms;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-name: flashing;
+}
+
+.pauseAnimation {
+  animation-play-state: paused;
+}
+
+@keyframes flashing {
+  0% {
+    opacity: 1;
+  }
+  49% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}

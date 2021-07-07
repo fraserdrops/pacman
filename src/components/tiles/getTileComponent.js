@@ -49,7 +49,6 @@ import {
   WallInternalStraightRight,
   WallInternalStraightTop,
 } from "./walls/WallInternalStraight";
-import { Fruit } from "./Fruit";
 
 export const getTileComponent = (tileType, display) => {
   const mapWallToComponent = {
@@ -130,9 +129,5 @@ export const getTileComponent = (tileType, display) => {
 
   if (tileType === "houseEntrance") {
     return HouseEntrance;
-  }
-
-  if (tileType === "fruit") {
-    return Fruit;
   }
 };
