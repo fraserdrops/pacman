@@ -60,7 +60,7 @@ const characterStartPositions = {
     colOffset: CENTER_COL_OFFSET,
   },
   blinky: {
-    row: GHOST_HOUSE_ROW,
+    row: GHOST_HOUSE_ROW - 3,
     col: GHOST_HOUSE_MIDDLE_COL,
     rowOffset: CENTER_ROW_OFFSET,
     colOffset: CENTER_COL_OFFSET,
@@ -309,10 +309,7 @@ const parent = createMachine(
                       },
                       REMOVE_FRUIT: {
                         target: "noFruit",
-                        actions: [
-                          "removeFruit",
-                          () => console.log("REMOJEOSR"),
-                        ],
+                        actions: ["removeFruit"],
                       },
                     },
                   },
@@ -320,16 +317,13 @@ const parent = createMachine(
                     on: {
                       REMOVE_FRUIT: {
                         target: "noFruit",
-                        actions: [
-                          "removeFruit",
-                          () => console.log("REMOJEOSR"),
-                        ],
+                        actions: ["removeFruit"],
                       },
                     },
                   },
                 },
               },
-              ghostRelease: {},
+
               loop: {
                 initial: "waiting",
                 states: {

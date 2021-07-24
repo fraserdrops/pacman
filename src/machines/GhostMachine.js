@@ -1,4 +1,11 @@
-import { createMachine, spawn, assign, actions, send } from "xstate";
+import {
+  createMachine,
+  spawn,
+  assign,
+  actions,
+  send,
+  sendParent,
+} from "xstate";
 import { getTileType } from "../shared/maze";
 const { raise, respond, choose } = actions;
 
@@ -17,16 +24,128 @@ const every = (...guards) => ({
   guards,
 });
 
-const CreateTicker = (intervalMS, callbackEventName) => {
-  return () => (callback) => {
-    const interval = setInterval(() => {
-      callback(callbackEventName);
-    }, intervalMS);
-    return () => {
-      clearInterval(interval);
-    };
-  };
-};
+const RED_ZONE_ROW = 14;
+const RED_ZONE_START_COL = 12;
+const RED_ZONE_END_COL = 14;
+
+const not = (guard) => ({
+  type: "not",
+  guard,
+});
+
+const TickerMachine = createMachine({
+  id: "ticker",
+  initial: "ticking",
+  context: {
+    intervalMS: undefined,
+    callbackEventName: "TICK",
+  },
+  states: {
+    ticking: {
+      invoke: {
+        src: (ctx) => (callback) => {
+          const interval = setInterval(() => {
+            callback("TICK");
+          }, ctx.intervalMS);
+          return () => {
+            clearInterval(interval);
+          };
+        },
+      },
+      on: {
+        TICK: {
+          actions: [sendParent((ctx) => ({ type: ctx.callbackEventName }))],
+        },
+        CHANGE_SPEED: {
+          target: "ticking",
+          internal: false,
+          actions: [assign({ intervalMS: (ctx, event) => event.intervalMS })],
+        },
+      },
+    },
+  },
+});
+
+const SpeedMachine = createMachine(
+  {
+    id: "Speed",
+    initial: "regularSpeed",
+    context: {
+      standardInterval: undefined,
+      overridenInterval: undefined,
+    },
+    invoke: {
+      src: TickerMachine,
+      id: "speedTicker",
+      data: {
+        intervalMS: (ctx, event) => ctx.standardInterval,
+        callbackEventName: "TICK",
+      },
+    },
+    on: {
+      TICK: {
+        actions: [() => console.log("GHOST"), sendParent("TICK")],
+      },
+    },
+    states: {
+      regularSpeed: {
+        on: {
+          changeSpeedRegular: {
+            actions: [
+              "changeSpeed",
+              assign({ standardInterval: (ctx, event) => event.intervalMS }),
+            ],
+          },
+          OVERRIDE_SPEED: {
+            target: "overridden",
+            actions: [
+              "changeSpeedOverridden",
+              assign({ overridenInterval: (ctx, event) => event.intervalMS }),
+            ],
+          },
+        },
+      },
+      overridden: {
+        on: {
+          OVERRIDE_SPEED: [
+            {
+              cond: "slowerSpeed",
+              actions: [
+                "changeSpeedOverridden",
+                assign({ overridenInterval: (ctx, event) => event.intervalMS }),
+              ],
+            },
+          ],
+          CLEAR_OVERRIDE: {
+            target: "regularSpeed",
+            actions: ["changeSpeedRegular", () => console.log("YOZAYOZA")],
+          },
+        },
+      },
+    },
+  },
+  {
+    guards: {
+      slowerSpeed: (ctx, event) => event.intervalMS < ctx.overridenInterval,
+    },
+    actions: {
+      changeSpeedOverridden: send(
+        (ctx, event) => ({
+          type: "CHANGE_SPEED",
+          intervalMS: ctx.overridenInterval,
+        }),
+        { to: "speedTicker" }
+      ),
+      changeSpeedRegular: send(
+        (ctx, event) => ({
+          type: "CHANGE_SPEED",
+          intervalMS: ctx.standardInterval,
+        }),
+        { to: "speedTicker" }
+      ),
+    },
+  }
+);
 
 const getProjectedPosition = (current, direction, ignoreOffsets) => {
   const { row, col, rowOffset, colOffset } = current;
@@ -114,8 +233,11 @@ const GhostMachine = createMachine(
       speed: {},
       gameState: {},
       subscription: {},
-      restrictedTiles: [],
-      restrictedDirections: [],
+      restrictions: {
+        speed: {},
+        directions: {},
+      },
+
       maze: [],
       gameConfig: {
         baseSpeed: 35,
@@ -180,34 +302,58 @@ const GhostMachine = createMachine(
               tunnel: {
                 initial: "outside",
                 states: {
-                  outside: {},
+                  outside: {
+                    on: {
+                      MOVEMENT_FINISHED: [
+                        // { cond: "inTunnel", target: "inside" },
+                      ],
+                    },
+                  },
                   inside: {
                     entry: ["applyTunnelRestrictions"],
                     exit: ["removeTunnelRestrictions"],
+                    on: {
+                      MOVEMENT_FINISHED: [
+                        // { cond: not("inTunnel"), target: "outside" },
+                      ],
+                    },
                   },
                 },
               },
               redZone: {
                 initial: "outside",
                 states: {
-                  outside: {},
+                  outside: {
+                    on: {
+                      MOVEMENT_FINISHED: [
+                        { cond: "inRedZone", target: "inside" },
+                      ],
+                    },
+                  },
                   inside: {
-                    entry: ["applyRedZoneRestrictions"],
+                    entry: [
+                      "applyRedZoneRestrictions",
+                      send(
+                        { type: "OVERRIDE_SPEED", intervalMS: 100 },
+                        { to: "speed" }
+                      ),
+                    ],
                     exit: ["removeRedZoneRestrictions"],
+                    on: {
+                      MOVEMENT_FINISHED: [
+                        {
+                          cond: not("inRedZone"),
+                          target: "outside",
+                          actions: [
+                            send({ type: "CLEAR_OVERRIDE" }, { to: "speed" }),
+                          ],
+                        },
+                      ],
+                    },
                   },
                 },
               },
-              ghostHouse: {
-                initial: "closed",
-                states: {
-                  closed: {},
-                  exitPermitted: {},
-                },
-              },
             },
-          },
-          direction: {
-            states: {},
           },
           movement: {
             initial: "idle",
@@ -221,7 +367,7 @@ const GhostMachine = createMachine(
                 on: {
                   TICK: {
                     target: "updateDirection",
-                    actions: ["setNextPosition"],
+                    actions: ["setNextPosition", "sendMovementFinished"],
                   },
                 },
               },
@@ -277,11 +423,45 @@ const GhostMachine = createMachine(
               },
             },
           },
-          chaseMode: {
+          speed: {
+            invoke: {
+              src: SpeedMachine,
+              id: "speed",
+              data: {
+                standardInterval: (ctx, event) =>
+                  1000 /
+                  (ctx.gameConfig.speedPercentage.normal *
+                    ctx.gameConfig.baseSpeed),
+                callbackEventName: "TICK",
+              },
+            },
+          },
+
+          direction: {
+            states: {
+              unrestricted: {},
+              restricted: {},
+            },
+          },
+          chaseStatus: {
             initial: "normal",
-            id: "chaseMode",
+            id: "chaseStatus",
             on: {},
             states: {
+              atHome: {
+                on: {
+                  LEAVE_HOME: {
+                    target: "leavingHome",
+                  },
+                },
+              },
+              leavingHome: {
+                on: {
+                  MOVEMENT_FINISHED: {
+                    target: "normal",
+                  },
+                },
+              },
               normal: {
                 tags: ["normal"],
                 initial: "chase",
@@ -295,6 +475,17 @@ const GhostMachine = createMachine(
                     type: "history",
                   },
                   chase: {
+                    entry: [
+                      send(
+                        (ctx) => ({
+                          type: "CHANGE_SPEED",
+                          intervalMS:
+                            ctx.gameConfig.speedPercentage.normal *
+                            ctx.gameConfig.baseSpeed,
+                        }),
+                        { to: "speed" }
+                      ),
+                    ],
                     on: {
                       SCATTER: {
                         target: "scatter",
@@ -303,41 +494,21 @@ const GhostMachine = createMachine(
                         actions: ["updateTargetTileNormalMode"],
                       },
                     },
-                    invoke: {
-                      id: "tick",
-                      src: (ctx) => (callback) => {
-                        const updateRate =
-                          1000 /
-                          (ctx.gameConfig.speedPercentage.normal *
-                            ctx.gameConfig.baseSpeed);
-                        const interval = setInterval(() => {
-                          callback("TICK");
-                        }, updateRate);
-
-                        return () => {
-                          clearInterval(interval);
-                        };
-                      },
-                    },
                   },
                   scatter: {
-                    entry: ["setTargetTileScatterMode"],
-                    invoke: {
-                      id: "tick",
-                      src: (ctx) => (callback) => {
-                        const updateRate =
-                          1000 /
-                          (ctx.gameConfig.speedPercentage.normal *
-                            ctx.gameConfig.baseSpeed);
-                        const interval = setInterval(() => {
-                          callback("TICK");
-                        }, updateRate);
+                    entry: [
+                      "setTargetTileScatterMode",
+                      send(
+                        (ctx) => ({
+                          type: "CHANGE_SPEED",
+                          intervalMS:
+                            ctx.gameConfig.speedPercentage.normal *
+                            ctx.gameConfig.baseSpeed,
+                        }),
+                        { to: "speed" }
+                      ),
+                    ],
 
-                        return () => {
-                          clearInterval(interval);
-                        };
-                      },
-                    },
                     on: {
                       CHASE: {
                         target: "scatter",
@@ -348,22 +519,17 @@ const GhostMachine = createMachine(
               },
               frightened: {
                 initial: "frightStarted",
-                invoke: {
-                  id: "tick",
-                  src: (ctx) => (callback) => {
-                    const updateRate =
-                      1000 /
-                      (ctx.gameConfig.speedPercentage.frightened *
-                        ctx.gameConfig.baseSpeed);
-                    const interval = setInterval(() => {
-                      callback("TICK");
-                    }, updateRate);
-
-                    return () => {
-                      clearInterval(interval);
-                    };
-                  },
-                },
+                entry: [
+                  send(
+                    (ctx) => ({
+                      type: "CHANGE_SPEED",
+                      intervalMS:
+                        ctx.gameConfig.speedPercentage.frightened *
+                        ctx.gameConfig.baseSpeed,
+                    }),
+                    { to: "speed" }
+                  ),
+                ],
                 states: {
                   frightStarted: {
                     tags: ["frightStarted"],
@@ -402,46 +568,41 @@ const GhostMachine = createMachine(
               returningHome: {
                 initial: "ideal",
                 tags: ["returningHome"],
-                invoke: {
-                  id: "tick",
-                  src: (ctx) => (callback) => {
-                    const updateRate =
-                      1000 /
-                      (ctx.gameConfig.speedPercentage.returning *
-                        ctx.gameConfig.baseSpeed);
-                    const interval = setInterval(() => {
-                      callback("TICK");
-                    }, updateRate);
-
-                    return () => {
-                      clearInterval(interval);
-                    };
-                  },
-                },
+                entry: [
+                  send(
+                    (ctx) => ({
+                      type: "CHANGE_SPEED",
+                      intervalMS:
+                        ctx.gameConfig.speedPercentage.returning *
+                        ctx.gameConfig.baseSpeed,
+                    }),
+                    { to: "ticker" }
+                  ),
+                ],
                 states: {
                   ideal: {
                     on: {
-                      TICK: [
+                      MOVEMENT_FINISHED: [
                         {
                           cond: "reachedHomeTile",
-                          target: "#chaseMode.normal.hist",
+                          target: "#chaseStatus.normal.hist",
                         },
                       ],
                     },
                   },
                   waitingScatter: {
-                    TICK: [
+                    MOVEMENT_FINISHED: [
                       {
                         cond: "reachedHomeTile",
-                        target: "#chaseMode.scatter",
+                        target: "#chaseStatus.scatter",
                       },
                     ],
                   },
                   waitingChase: {
-                    TICK: [
+                    MOVEMENT_FINISHED: [
                       {
                         cond: "reachedHomeTile",
-                        target: "#chaseMode.chase",
+                        target: "#chaseStatus.chase",
                       },
                     ],
                   },
@@ -472,6 +633,7 @@ const GhostMachine = createMachine(
           nextDirection: ctx.nextDirection,
         };
       }),
+      sendMovementFinished: send("MOVEMENT_FINISHED"),
 
       setPosition: assign({
         position: (ctx, event) => event.position,
@@ -584,6 +746,13 @@ const GhostMachine = createMachine(
           return guards.every((guardKey) => this[guardKey](ctx, event));
         };
       },
+      get not() {
+        return (ctx, event, { cond }) => {
+          const { guard } = cond;
+          console.log("NONTONOT", this[guard](ctx, event));
+          return !this[guard](ctx, event);
+        };
+      },
       reachedHomeTile: (ctx) => {
         const { homeTile } = ctx.ghostConfig;
         return (
@@ -595,7 +764,14 @@ const GhostMachine = createMachine(
         const { position } = ctx;
         return position.rowOffset === 4 && position.colOffset === 4;
       },
-      inRedZone: () => true,
+      inRedZone: (ctx) => {
+        const { position } = ctx;
+        return (
+          position.row === RED_ZONE_ROW &&
+          RED_ZONE_START_COL <= position.col &&
+          position.col <= RED_ZONE_END_COL
+        );
+      },
       // turningWouldNotCollideWithWall: (ctx) => {
       //   const { position, requestedDirection, maze } = ctx;
       //   const nextPosition = getProjectedPosition(
