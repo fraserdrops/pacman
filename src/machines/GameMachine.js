@@ -656,30 +656,6 @@ const parent = createMachine(
         totalPoints: (ctx, event, { action }) =>
           ctx.totalPoints + action.points,
       }),
-      // dropFruit: assign({
-      //   maze: (ctx) => {
-      //     const { maze } = ctx;
-      //     const updatedMaze = { ...maze };
-      //     setTileType(
-      //       updatedMaze.tiles,
-      //       { row: FRUIT_DROP_ROW, col: FRUIT_DROP_COL },
-      //       "fruit"
-      //     );
-      //     return updatedMaze;
-      //   },
-      // }),
-      // removeFruit: assign({
-      //   maze: (ctx) => {
-      //     const { maze } = ctx;
-      //     const updatedMaze = { ...maze };
-      //     setTileType(
-      //       updatedMaze.tiles,
-      //       { row: FRUIT_DROP_ROW, col: FRUIT_DROP_COL },
-      //       "empty"
-      //     );
-      //     return updatedMaze;
-      //   },
-      // }),
       dropFruit: assign({
         fruit: () => ({
           type: "orange",
