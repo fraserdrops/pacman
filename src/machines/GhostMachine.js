@@ -5,6 +5,7 @@ import {
   actions,
   send,
   sendParent,
+  forwardTo,
 } from "xstate";
 import { getTileType } from "../shared/maze";
 const { raise, respond, choose } = actions;
@@ -166,7 +167,7 @@ const SimpleSpeedMachine = createMachine(
     id: "Speed",
     initial: "applySpeedMultipliers",
     context: {
-      currentBaseInterval: "",
+      currentBaseInterval: 1000,
       specialSpeedMultipliers: {},
       standardInterval: 1000,
     },
@@ -174,7 +175,7 @@ const SimpleSpeedMachine = createMachine(
       src: TickerMachine,
       id: "speedTicker",
       data: {
-        intervalMS: (ctx, event) => ctx.standardInterval,
+        intervalMS: (ctx, event) => ctx.currentBaseInterval,
         callbackEventName: "TICK",
       },
     },
@@ -192,7 +193,7 @@ const SimpleSpeedMachine = createMachine(
               "changeSpeedWithMultipliers",
             ],
           },
-          OVERRIDE_MULTIPLIERS: {
+          OVERRIDE_SPEED_MULTIPLIERS: {
             target: "ignoreMultipliers",
             actions: ["changeSpeedOverridden"],
           },
@@ -212,7 +213,7 @@ const SimpleSpeedMachine = createMachine(
       },
       ignoreMultipliers: {
         on: {
-          CLEAR_OVERRIDE: {
+          APPLY_SPEED_MULTIPLIERS: {
             target: "applySpeedMultipliers",
             actions: ["changeSpeedWithMultipliers"],
           },
@@ -286,16 +287,16 @@ const DirectionMachine = createMachine(
     },
     on: {
       ADD_RESTRICTED_TILES: {
-        actions: ["addRestrictedTile"],
+        actions: ["addRestrictedTiles"],
       },
       REMOVE_RESTRICTED_TILES: {
-        actions: ["removeRestrictedTile"],
+        actions: ["removeRestrictedTiles"],
       },
-      ADD_RESTRICTED_DIRECTION: {
-        actions: ["addRestrictedDirection"],
+      ADD_RESTRICTED_DIRECTIONS: {
+        actions: ["addRestrictedDirections"],
       },
-      REMOVE_RESTRICTED_DIRECTION: {
-        actions: ["removeRestrictedDirection"],
+      REMOVE_RESTRICTED_DIRECTIONS: {
+        actions: ["removeRestrictedDirections"],
       },
     },
     states: {
@@ -348,30 +349,33 @@ const DirectionMachine = createMachine(
 
         return { type: "UPDATE_NEXT_DIRECTION", nextDirection };
       }),
-      addRestrictedTile: assign({
+      addRestrictedTiles: assign({
         restrictedTiles: (ctx, event) => {
-          return {
-            ...ctx.restrictedTiles,
-            [tileToString(event.tile)]: event.tile,
-          };
+          const restrictedTiles = { ...ctx.restrictedTiles };
+          event.tiles.forEach(
+            (tile) => (restrictedTiles[tileToString(event.tile)] = tile)
+          );
+          return restrictedTiles;
         },
       }),
-      removeRestrictedTile: assign({
+      removeRestrictedTiles: assign({
         restrictedTiles: (ctx, event) => {
           const newRestrictedTiles = { ...ctx.restrictedTiles };
-          delete newRestrictedTiles[tileToString(event.tile)];
+          event.tiles.forEach(
+            (tile) => delete newRestrictedTiles[tileToString(tile)]
+          );
           return newRestrictedTiles;
         },
       }),
-      addRestrictedDirection: assign({
+      addRestrictedDirections: assign({
         restrictedDirections: (ctx, event) => {
-          return [...ctx.restrictedDirections, event.direction];
+          return [...ctx.restrictedDirections, ...event.directions];
         },
       }),
-      removeRestrictedDirection: assign({
+      removeRestrictedDirections: assign({
         restrictedDirections: (ctx, event) => {
           return ctx.restrictedDirections.filter(
-            (direction) => direction !== event.direction
+            (direction) => !event.directions.includes(direction)
           );
         },
       }),
@@ -403,13 +407,43 @@ const MovementMachine = createMachine(
       PAUSE: {
         target: ".paused",
       },
+      CHANGE_TARGET_TILE: {
+        actions: [
+          "setTargetTile",
+          (ctx, event) => console.log("SET TARGET TILE", event),
+        ],
+      },
+      REMOVE_SPECIAL_SPEED: {
+        actions: [forwardTo("speed")],
+      },
+      SPECIAL_SPEED: {
+        actions: [forwardTo("speed")],
+      },
+      CLEAR_SPEED_OVERRIDE: {
+        actions: [forwardTo("speed")],
+      },
+      OVERRIDE_SPEED: {
+        actions: [forwardTo("speed")],
+      },
+      ADD_RESTRICTED_DIRECTIONS: {
+        actions: [forwardTo("direction")],
+      },
+      REMOVE_RESTRICTED_DIRECTIONS: {
+        actions: [forwardTo("direction")],
+      },
+      ADD_RESTRICTED_TILES: {
+        actions: [forwardTo("direction")],
+      },
+      REMOVE_RESTRICTED_TILES: {
+        actions: [forwardTo("direction")],
+      },
     },
     invoke: [
       {
         src: SimpleSpeedMachine,
         id: "speed",
         data: {
-          standardInterval: (ctx, event) =>
+          currentBaseInterval: (ctx, event) =>
             1000 /
             (ctx.gameConfig.speedPercentage.normal * ctx.gameConfig.baseSpeed),
           callbackEventName: "TICK",
@@ -471,6 +505,7 @@ const MovementMachine = createMachine(
                 actions: ["switchToNextDirection", "chooseNextDirection"],
               },
             ]),
+            "sendMovementFinished",
           ],
         },
       },
@@ -512,6 +547,10 @@ const MovementMachine = createMachine(
       },
     },
     actions: {
+      sendMovementFinished: sendParent((ctx) => ({
+        type: "MOVEMENT_FINISHED",
+        targetTile: ctx.targetTile,
+      })),
       chooseNextDirection: send(
         (ctx, event) => {
           const { maze, position, direction, targetTile } = ctx;
@@ -537,26 +576,9 @@ const MovementMachine = createMachine(
       setNextPosition: assign({
         position: (ctx) => getProjectedPosition(ctx.position, ctx.direction),
       }),
-      applyRedZoneRestrictions: send(
-        {
-          type: "SPECIAL_SPEED",
-          specialKey: "redZone",
-          specialMultiplier: 0.5,
-        },
-        { to: "speed" }
-      ),
-      removeRedZoneRestrictions: send(
-        { type: "REMOVE_SPECIAL_SPEED", specialKey: "redZone" },
-        { to: "speed" }
-      ),
-      applyTunnelRestrictions: send(
-        { type: "OVERRIDE_SPEED", intervalMS: 500 },
-        { to: "speed" }
-      ),
-      removeTunnelRestrictions: send(
-        { type: "CLEAR_OVERRIDE" },
-        { to: "speed" }
-      ),
+      setTargetTile: assign({
+        targetTile: (ctx, event) => event.targetTile,
+      }),
     },
   }
 );
@@ -719,12 +741,108 @@ const GhostMachine = createMachine(
         states: {
           // in the maze there are certain zones that affect the ghosts behaviour
           zones: {
-            initial: "none",
             type: "parallel",
             states: {
-              tunnel: {
-                initial: "outside",
+              targetTile: {
+                initial: "init",
                 states: {
+                  init: {
+                    always: [
+                      {
+                        cond: "onTargetTile",
+                        target: "inside",
+                        actions: ["sendOnTargetTile"],
+                      },
+                      {
+                        target: "outside",
+                        actions: [""],
+                      },
+                    ],
+                  },
+                  outside: {
+                    on: {
+                      MOVEMENT_FINISHED: [
+                        {
+                          cond: "onTargetTile",
+                          target: "inside",
+                          actions: ["sendOnTargetTile"],
+                        },
+                      ],
+                    },
+                  },
+                  inside: {
+                    entry: ["sendOnTargetTile"],
+                    exit: [""],
+                    on: {
+                      MOVEMENT_FINISHED: [
+                        {
+                          cond: not("onTargetTile"),
+                          target: "outside",
+                          actions: [""],
+                        },
+                      ],
+                    },
+                  },
+                },
+              },
+              ghostHouse: {
+                initial: "init",
+                states: {
+                  init: {
+                    always: [
+                      {
+                        cond: "inGhostHouse",
+                        target: "inside",
+                        actions: ["sendInsideGhostHouse"],
+                      },
+                      {
+                        target: "outside",
+                        actions: ["sendOutsideGhostHouse"],
+                      },
+                    ],
+                  },
+                  outside: {
+                    on: {
+                      MOVEMENT_FINISHED: [
+                        {
+                          cond: "inGhostHouse",
+                          target: "inside",
+                          actions: ["sendInsideGhostHouse"],
+                        },
+                      ],
+                    },
+                  },
+                  inside: {
+                    entry: ["sendInsideGhostHouse"],
+                    exit: ["sendOutsideGhostHouse"],
+                    on: {
+                      MOVEMENT_FINISHED: [
+                        {
+                          cond: not("inGhostHouse"),
+                          target: "outside",
+                          actions: ["sendOutsideGhostHouse"],
+                        },
+                      ],
+                    },
+                  },
+                },
+              },
+              tunnel: {
+                initial: "init",
+                states: {
+                  init: {
+                    always: [
+                      {
+                        cond: "inTunnel",
+                        target: "inside",
+                        actions: ["applyTunnelRestrictions"],
+                      },
+                      {
+                        target: "outside",
+                        actions: [],
+                      },
+                    ],
+                  },
                   outside: {
                     on: {
                       MOVEMENT_FINISHED: [
@@ -752,15 +870,28 @@ const GhostMachine = createMachine(
                 },
               },
               redZone: {
-                initial: "outside",
+                initial: "init",
                 states: {
+                  init: {
+                    always: [
+                      {
+                        cond: "inTunnel",
+                        target: "inside",
+                        actions: ["applyRedZoneRestrictions"],
+                      },
+                      {
+                        target: "outside",
+                        actions: [],
+                      },
+                    ],
+                  },
                   outside: {
                     on: {
                       MOVEMENT_FINISHED: [
                         {
                           cond: "inRedZone",
                           target: "inside",
-                          actions: [send("ENTER_RED_ZONE")],
+                          actions: ["applyRedZoneRestrictions"],
                         },
                       ],
                     },
@@ -771,7 +902,7 @@ const GhostMachine = createMachine(
                         {
                           cond: not("inRedZone"),
                           target: "outside",
-                          actions: [send("EXIT_RED_ZONE")],
+                          actions: ["removeRedZoneRestrictions"],
                         },
                       ],
                     },
@@ -781,20 +912,60 @@ const GhostMachine = createMachine(
             },
           },
           chaseStatus: {
-            initial: "normal",
+            initial: "init",
             id: "chaseStatus",
             on: {},
             states: {
-              atHome: {
+              init: {
+                tags: ["normal"],
                 on: {
-                  LEAVE_HOME: {
+                  INSIDE_GHOST_HOUSE: {
+                    target: "atHome",
+                  },
+                  OUTSIDE_GHOST_HOUSE: {
                     target: "leavingHome",
                   },
                 },
               },
+              atHome: {
+                initial: "exitLeft",
+                tags: ["normal"],
+                entry: ["setHomeTargetTile"],
+                states: {
+                  exitLeft: {
+                    on: {
+                      SCATTER: {
+                        target: "exitRight",
+                      },
+                      CHASE: {
+                        target: "exitRight",
+                      },
+                      LEAVE_HOME: {
+                        target: "aboutToLeave",
+                        actions: ["setTargetTileExitLeft"],
+                      },
+                    },
+                  },
+                  exitRight: {
+                    on: {
+                      LEAVE_HOME: {
+                        target: "aboutToLeave",
+                        actions: ["setTargetTileExitRight"],
+                      },
+                    },
+                  },
+                  aboutToLeave: {
+                    type: "final",
+                  },
+                },
+                onDone: {
+                  target: "leavingHome",
+                },
+              },
               leavingHome: {
+                tags: ["normal"],
                 on: {
-                  MOVEMENT_FINISHED: {
+                  ON_TARGET_TILE: {
                     target: "normal",
                   },
                 },
@@ -848,7 +1019,7 @@ const GhostMachine = createMachine(
 
                     on: {
                       CHASE: {
-                        target: "scatter",
+                        target: "chase",
                       },
                     },
                   },
@@ -969,54 +1140,81 @@ const GhostMachine = createMachine(
       }),
       applyRedZoneRestrictions: send(
         {
-          type: "SPECIAL_SPEED",
-          specialKey: "redZone",
-          specialMultiplier: 0.5,
+          type: "ADD_RESTRICTED_DIRECTIONS",
+          directions: ["left"],
         },
-        { to: "speed" }
+        { to: "movement" }
       ),
       removeRedZoneRestrictions: send(
-        { type: "REMOVE_SPECIAL_SPEED", specialKey: "redZone" },
-        { to: "speed" }
+        {
+          type: "REMOVE_RESTRICTED_DIRECTIONS",
+          directions: ["left"],
+        },
+        { to: "movement" }
       ),
       applyTunnelRestrictions: send(
-        { type: "OVERRIDE_SPEED", intervalMS: 500 },
-        { to: "speed" }
+        { type: "SPECIAL_SPEED", specialKey: "tunnel", specialMultiplier: 0.5 },
+        { to: "movement" }
       ),
       removeTunnelRestrictions: send(
-        { type: "CLEAR_OVERRIDE" },
-        { to: "speed" }
+        { type: "REMOVE_SPECIAL_SPEED", specialKey: "tunnel" },
+        { to: "movement" }
       ),
       sendMovementFinished: send("MOVEMENT_FINISHED"),
-
       setPosition: assign({
         position: (ctx, event) => event.position,
-      }),
-      setTargetTileScatterMode: assign({
-        targetTile: (ctx) => ctx.ghostConfig.scatterTargetTile,
-      }),
-      updateTargetTileNormalMode: assign({
-        targetTile: (ctx) => ctx.ghostConfig.targetTile,
-      }),
-      setHomeTargetTile: assign({
-        targetTile: (ctx) => ctx.ghostConfig.homeTile,
       }),
       updateGameState: assign({
         gameState: (ctx, event) => event.gameState,
       }),
-      chooseNextDirection: send((ctx, event) => {
-        const { maze, position, direction, targetTile } = ctx;
-        return {
-          type: "CALCULATE_NEXT_DIRECTION",
-          maze,
-          position,
-          direction,
-          targetTile,
-        };
-      }),
-      switchToNextDirection: assign({
-        direction: (ctx) => ctx.nextDirection,
-      }),
+      setTargetTileScatterMode: send(
+        (ctx) => ({
+          type: "CHANGE_TARGET_TILE",
+          targetTile: { row: 15, col: 15 },
+        }),
+        { to: "movement" }
+      ),
+      updateTargetTileNormalMode: send(
+        (ctx) => ({
+          type: "CHANGE_TARGET_TILE",
+          targetTile: ctx.ghostConfig.targetTile,
+        }),
+        { to: "movement" }
+      ),
+      setTargetTileExitLeft: send(
+        (ctx) => ({
+          type: "CHANGE_TARGET_TILE",
+          targetTile: ctx.ghostConfig.leftExitTile,
+        }),
+        { to: "movement" }
+      ),
+      setTargetTileExitRight: send(
+        (ctx) => ({
+          type: "CHANGE_TARGET_TILE",
+          targetTile: ctx.ghostConfig.rightExitTile,
+        }),
+        { to: "movement" }
+      ),
+      setHomeTargetTile: send(
+        (ctx) => ({
+          type: "CHANGE_TARGET_TILE",
+          targetTile: ctx.ghostConfig.homeTile,
+        }),
+        { to: "movement" }
+      ),
+      sendOnTargetTile: send({ type: "ON_TARGET_TILE" }),
+      sendInsideGhostHouse: send({ type: "INSIDE_GHOST_HOUSE" }),
+      sendOutsideGhostHouse: send({ type: "OUTSIDE_GHOST_HOUSE" }),
+
+      // setTargetTileScatterMode: assign({
+      //   targetTile: (ctx) => ctx.ghostConfig.scatterTargetTile,
+      // }),
+      // updateTargetTileNormalMode: assign({
+      //   targetTile: (ctx) => ctx.ghostConfig.targetTile,
+      // }),
+      // setHomeTargetTile: assign({
+      //   targetTile: (ctx) => ctx.ghostConfig.homeTile,
+      // }),
     },
     guards: {
       get every() {
@@ -1031,16 +1229,21 @@ const GhostMachine = createMachine(
           return !this[guard](ctx, event);
         };
       },
+      onTargetTile: (ctx, event) => {
+        const { targetTile } = event;
+        if (!targetTile) {
+          return false;
+        }
+        return (
+          targetTile.row === ctx.position.row &&
+          targetTile.col === ctx.position.col
+        );
+      },
       reachedHomeTile: (ctx) => {
         const { homeTile } = ctx.ghostConfig;
         return (
           homeTile.row === ctx.position.row && homeTile.col === ctx.position.col
         );
-      },
-      noMoreFramesToSkip: (ctx) => ctx.framesToSkip === 1,
-      canChangeDirection: (ctx) => {
-        const { position } = ctx;
-        return position.rowOffset === 4 && position.colOffset === 4;
       },
       inRedZone: (ctx) => {
         const { position, maze } = ctx;
@@ -1053,7 +1256,6 @@ const GhostMachine = createMachine(
           );
         });
       },
-
       inTunnel: (ctx) => {
         const { position, maze } = ctx;
         return maze.zones.tunnels.some((tunnel) => {
@@ -1065,17 +1267,15 @@ const GhostMachine = createMachine(
           );
         });
       },
-      inCenterOfTile: (ctx) => {
-        // pacman can turn if he is at the center of the current tile
-        const { direction, position } = ctx;
-        const { colOffset, rowOffset } = position;
-        if (direction === "up" || direction === "down") {
-          return rowOffset === CENTER_ROW_OFFSET;
-        }
-
-        if (direction === "left" || direction === "right") {
-          return colOffset === CENTER_COL_OFFSET;
-        }
+      inGhostHouse: (ctx) => {
+        const { position, maze } = ctx;
+        const { ghostHouse } = maze.zones;
+        return (
+          ghostHouse.start.row <= position.row &&
+          position.row <= ghostHouse.end.row &&
+          ghostHouse.start.col <= position.col &&
+          position.col <= ghostHouse.end.col
+        );
       },
     },
   }

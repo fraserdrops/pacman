@@ -80,6 +80,8 @@ const getPoints = (event) => {
   return pointsMap[event];
 };
 
+const NUMBER_OF_LIVES = 3;
+
 const parent = createMachine(
   {
     id: "parent",
@@ -97,9 +99,18 @@ const parent = createMachine(
         pelletsFirstFruit: 12,
         pelletsSecondFruit: 50,
       },
+      pelletCounters: {
+        personal: {
+          pinky: 0,
+          inky: 0,
+          clyde: 0,
+        },
+        global: 0,
+      },
       totalPoints: 0,
       ghostsEaten: 0,
       pelletsEaten: 0,
+      livesRemaining: NUMBER_OF_LIVES,
     },
     initial: "initial",
     states: {
@@ -140,6 +151,14 @@ const parent = createMachine(
                         col: 1,
                       },
                       homeTile: characterStartPositions.inky,
+                      leftExitTile: {
+                        row: GHOST_HOUSE_ROW - 3,
+                        col: GHOST_HOUSE_MIDDLE_COL - 1,
+                      },
+                      rightExitTile: {
+                        row: GHOST_HOUSE_ROW - 3,
+                        col: GHOST_HOUSE_MIDDLE_COL + 1,
+                      },
                     },
                   }),
                   "inky"
@@ -162,6 +181,14 @@ const parent = createMachine(
                         col: 12,
                       },
                       homeTile: characterStartPositions.pinky,
+                      leftExitTile: {
+                        row: GHOST_HOUSE_ROW - 3,
+                        col: GHOST_HOUSE_MIDDLE_COL - 1,
+                      },
+                      rightExitTile: {
+                        row: GHOST_HOUSE_ROW - 3,
+                        col: GHOST_HOUSE_MIDDLE_COL + 1,
+                      },
                     },
                   }),
                   "pinky"
@@ -184,6 +211,14 @@ const parent = createMachine(
                         col: 3,
                       },
                       homeTile: characterStartPositions.clyde,
+                      leftExitTile: {
+                        row: GHOST_HOUSE_ROW - 3,
+                        col: GHOST_HOUSE_MIDDLE_COL - 1,
+                      },
+                      rightExitTile: {
+                        row: GHOST_HOUSE_ROW - 3,
+                        col: GHOST_HOUSE_MIDDLE_COL + 1,
+                      },
                     },
                   }),
                   "clyde"
@@ -196,6 +231,7 @@ const parent = createMachine(
                     maze: ctx.maze,
                     character: "blinky",
                     position: characterStartPositions.blinky,
+                    direction: "left",
                     ghostConfig: {
                       scatterTargetTile: {
                         row: 3,
@@ -261,6 +297,207 @@ const parent = createMachine(
               },
             },
             states: {
+              ghostExit: {
+                type: "parallel",
+                states: {
+                  ghosts: {
+                    initial: "pinkyActive",
+                    states: {
+                      pinkyActive: {
+                        on: {
+                          UPDATE_PERSONAL_COUNTER: [
+                            {
+                              cond: "pinkyLeavePersonal",
+                              target: "inkyActive",
+                              actions: [
+                                {
+                                  type: "incrementPersonalCounter",
+                                  ghost: "pinky",
+                                },
+                                "pinkyLeaveHome",
+                              ],
+                            },
+                            {
+                              actions: [
+                                {
+                                  type: "incrementPersonalCounter",
+                                  ghost: "pinky",
+                                },
+                              ],
+                            },
+                          ],
+                          GLOBAL_COUNTER_INCREMENTED: [
+                            {
+                              cond: "pinkyLeaveGlobal",
+                              target: "inkyActive",
+                            },
+                            {
+                              cond: "shouldResetGlobalCounter",
+                              actions: [send("RESET_GLOBAL_COUNTER")],
+                            },
+                          ],
+                          NEXT_GHOST_LEAVE_HOME: {
+                            target: "inkyActive",
+                            actions: ["pinkyLeaveHome"],
+                          },
+                        },
+                      },
+                      inkyActive: {
+                        entry: [() => console.log("INKY ACTIVE")],
+                        on: {
+                          UPDATE_PERSONAL_COUNTER: [
+                            {
+                              cond: "inkyLeavePersonal",
+                              target: "clydeActive",
+                              actions: [
+                                {
+                                  type: "incrementPersonalCounter",
+                                  ghost: "inky",
+                                },
+                                "inkyLeaveHome",
+                                (ctx) =>
+                                  console.log("INKY DOTS", ctx.pelletCounters),
+                              ],
+                            },
+                            {
+                              actions: [
+                                {
+                                  type: "incrementPersonalCounter",
+                                  ghost: "inky",
+                                },
+                                (ctx) =>
+                                  console.log("INKY DOTS", ctx.pelletCounters),
+                              ],
+                            },
+                          ],
+                          GLOBAL_COUNTER_INCREMENTED: [
+                            {
+                              cond: "inkyLeaveGlobal",
+                              target: "clydeActive",
+                            },
+                            {
+                              cond: "shouldResetGlobalCounter",
+                              actions: [send("RESET_GLOBAL_COUNTER")],
+                            },
+                          ],
+                          NEXT_GHOST_LEAVE_HOME: {
+                            target: "clydeActive",
+                            actions: ["inkyLeaveHome"],
+                          },
+                        },
+                      },
+                      clydeActive: {
+                        on: {
+                          UPDATE_PERSONAL_COUNTER: [
+                            {
+                              cond: "clydeLeavePersonal",
+                              target: "allGhostsExited",
+                              actions: [
+                                {
+                                  type: "incrementPersonalCounter",
+                                  ghost: "clyde",
+                                },
+                                "clydeLeaveHome",
+                              ],
+                            },
+                            {
+                              actions: [
+                                {
+                                  type: "incrementPersonalCounter",
+                                  ghost: "clyde",
+                                },
+                              ],
+                            },
+                          ],
+                          GLOBAL_COUNTER_INCREMENTED: [
+                            {
+                              cond: "clydeLeaveGlobal",
+                              target: "allGhostsExited",
+                            },
+                            {
+                              cond: "shouldResetGlobalCounter",
+                              actions: [send("RESET_GLOBAL_COUNTER")],
+                            },
+                          ],
+                          NEXT_GHOST_LEAVE_HOME: {
+                            target: "allGhostsExited",
+                            actions: ["clydeLeaveHome"],
+                          },
+                        },
+                      },
+                      allGhostsExited: {
+                        type: "final",
+                      },
+                    },
+                  },
+                  timer: {
+                    invoke: {
+                      src: (ctx) => (callback) => {
+                        const interval = setInterval(() => {
+                          callback("NEXT_GHOST_LEAVE_HOME");
+                        }, 4000);
+                        return () => {
+                          clearInterval(interval);
+                        };
+                      },
+                    },
+                    on: {
+                      PELLET_EATEN: {
+                        target: "timer",
+                        internal: false,
+                      },
+                    },
+                  },
+                  counter: {
+                    initial: "init",
+                    states: {
+                      init: {
+                        always: [
+                          {
+                            target: "personalCounters",
+                            cond: "noLivesLost",
+                          },
+                          { target: "globalCounter" },
+                        ],
+                      },
+                      personalCounters: {
+                        initial: "init",
+                        states: {
+                          init: {
+                            always: {
+                              actions: [send("UPDATE_PERSONAL_COUNTER")],
+                              target: "ready",
+                            },
+                          },
+                          ready: {},
+                        },
+                        on: {
+                          PELLET_EATEN: {
+                            actions: [
+                              "incrementPersonalCounter",
+                              "notifyPersonalCounterIncremented",
+                            ],
+                          },
+                        },
+                      },
+                      globalCounter: {
+                        on: {
+                          PELLET_EATEN: {
+                            actions: [
+                              "incrementPersonalCounter",
+                              "notifyPersonalCounterIncremented",
+                            ],
+                          },
+                          RESET_GLOBAL_COUNTER: {
+                            target: "personalCounters",
+                            actions: ["resetGlobalCounter"],
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
               fruit: {
                 initial: "noFruit",
                 states: {
@@ -822,6 +1059,46 @@ const parent = createMachine(
           )
         );
       }),
+      pinkyLeaveHome: send(
+        {
+          type: "LEAVE_HOME",
+        },
+        { to: "pinky" }
+      ),
+      inkyLeaveHome: send(
+        {
+          type: "LEAVE_HOME",
+        },
+        { to: "inky" }
+      ),
+      clydeLeaveHome: send(
+        {
+          type: "LEAVE_HOME",
+        },
+        { to: "clyde" }
+      ),
+      notifyPersonalCounterIncremented: send("UPDATE_PERSONAL_COUNTER"),
+      incrementPersonalCounter: assign({
+        pelletCounters: (ctx, event, { action }) => ({
+          ...ctx.pelletCounters,
+          personal: {
+            ...ctx.pelletCounters.personal,
+            [action.ghost]: ctx.pelletCounters.personal[action.ghost] + 1,
+          },
+        }),
+      }),
+      resetGlobalCounter: assign({
+        pelletCounters: (ctx) => ({
+          ...ctx.pelletCounters,
+          global: 0,
+        }),
+      }),
+      incrementGlobalCounter: assign({
+        pelletCounters: (ctx) => ({
+          ...ctx.pelletCounters,
+          global: ctx.pelletCounter.global + 1,
+        }),
+      }),
       notifyFrightEndingSoon: pure((ctx) => {
         return ["pacman", ...Object.keys(ctx.ghosts)].map((character) =>
           send(
@@ -878,6 +1155,7 @@ const parent = createMachine(
       }),
     },
     guards: {
+      noLivesLost: (ctx, event) => ctx.livesRemaining === NUMBER_OF_LIVES,
       allResponsesReceived: (ctx, event) =>
         ctx.waitingForResponse.length === 1 &&
         ctx.waitingForResponse[0] === event.character,
@@ -909,6 +1187,9 @@ const parent = createMachine(
       },
       shouldDropSecondFruit: (ctx) =>
         ctx.pelletsEaten === ctx.gameConfig.pelletsSecondFruit - 1,
+      pinkyLeavePersonal: (ctx) => ctx.pelletCounters.personal.pinky === 0,
+      inkyLeavePersonal: (ctx) => ctx.pelletCounters.personal.inky === 30,
+      clydeLeavePersonal: (ctx) => ctx.pelletCounters.personal.clyde === 60,
     },
   }
 );
