@@ -911,10 +911,35 @@ const GhostMachine = createMachine(
               },
             },
           },
+          gameChaseMode: {
+            id: "gameChaseMode",
+            initial: "chase",
+            on: {
+              SCATTER: {
+                target: ".scatter",
+              },
+              CHASE: {
+                target: ".chase",
+              },
+              FRIGHTENED: {
+                target: ".frightened",
+              },
+            },
+            states: {
+              chase: {
+                entry: [() => console.log("CHASE BABY")],
+              },
+              scatter: {
+                entry: [() => console.log("SCATTER BABY")],
+              },
+              frightened: {
+                entry: [() => console.log("FRIGHT BABY")],
+              },
+            },
+          },
           chaseStatus: {
             initial: "init",
             id: "chaseStatus",
-            on: {},
             states: {
               init: {
                 tags: ["normal"],
@@ -971,19 +996,32 @@ const GhostMachine = createMachine(
                 },
               },
               normal: {
-                tags: ["normal"],
-                initial: "chase",
-                on: {
-                  FRIGHTENED: {
-                    target: "frightened",
-                  },
+                DIED: {
+                  target: "dead",
                 },
+                initial: "checkingGameModeState",
                 states: {
-                  hist: {
-                    type: "history",
+                  checkingGameModeState: {
+                    tags: ["normal"],
+                    always: [
+                      {
+                        target: "chase",
+                        in: "#ghostMachine.playing.gameChaseMode.chase",
+                      },
+                      {
+                        target: "scatter",
+                        in: "#ghostMachine.playing.gameChaseMode.scatter",
+                      },
+                      {
+                        target: "frightened",
+                        in: "#ghostMachine.playing.gameChaseMode.frightened",
+                      },
+                    ],
                   },
                   chase: {
+                    tags: ["normal"],
                     entry: [
+                      () => console.log("I AM IN CHASE"),
                       send(
                         (ctx) => ({
                           type: "CHANGE_SPEED",
@@ -998,13 +1036,18 @@ const GhostMachine = createMachine(
                       SCATTER: {
                         target: "scatter",
                       },
+                      FRIGHTENED: {
+                        target: "frightened",
+                      },
                       TICK: {
                         actions: ["updateTargetTileNormalMode"],
                       },
                     },
                   },
                   scatter: {
+                    tags: ["normal"],
                     entry: [
+                      () => console.log("I AM IN SCATTER"),
                       "setTargetTileScatterMode",
                       send(
                         (ctx) => ({
@@ -1016,51 +1059,54 @@ const GhostMachine = createMachine(
                         { to: "movement" }
                       ),
                     ],
-
                     on: {
                       CHASE: {
                         target: "chase",
                       },
-                    },
-                  },
-                },
-              },
-              frightened: {
-                initial: "frightStarted",
-                entry: [
-                  send(
-                    (ctx) => ({
-                      type: "CHANGE_SPEED",
-                      intervalMS:
-                        ctx.gameConfig.speedPercentage.frightened *
-                        ctx.gameConfig.baseSpeed,
-                    }),
-                    { to: "movement" }
-                  ),
-                ],
-                states: {
-                  frightStarted: {
-                    tags: ["frightStarted"],
-                    on: {
-                      FRIGHT_ENDING_SOON: {
-                        target: "frightEnding",
+                      FRIGHTENED: {
+                        target: "frightened",
                       },
                     },
                   },
-                  frightEnding: {
-                    tags: ["frightEnding"],
-                  },
-                },
-                on: {
-                  END_FRIGHT: {
-                    target: "normal",
-                  },
-                  DIED: {
-                    target: "dead",
-                  },
-                  FRIGHTENED: {
-                    target: "frightened",
-                    internal: false,
+                  frightened: {
+                    initial: "frightStarted",
+                    entry: [
+                      send(
+                        (ctx) => ({
+                          type: "CHANGE_SPEED",
+                          intervalMS:
+                            ctx.gameConfig.speedPercentage.frightened *
+                            ctx.gameConfig.baseSpeed,
+                        }),
+                        { to: "movement" }
+                      ),
+                    ],
+                    states: {
+                      frightStarted: {
+                        tags: ["frightStarted"],
+                        on: {
+                          FRIGHT_ENDING_SOON: {
+                            target: "frightEnding",
+                          },
+                        },
+                      },
+                      frightEnding: {
+                        tags: ["frightEnding"],
+                      },
+                    },
+                    on: {
+                      SCATTER: {
+                        target: "scatter",
+                      },
+                      CHASE: {
+                        target: "chase",
+                      },
+
+                      FRIGHTENED: {
+                        target: "frightened",
+                        internal: false,
+                      },
+                    },
                   },
                 },
               },
@@ -1074,8 +1120,15 @@ const GhostMachine = createMachine(
                 },
               },
               returningHome: {
-                initial: "ideal",
                 tags: ["returningHome"],
+                on: {
+                  MOVEMENT_FINISHED: [
+                    {
+                      cond: "reachedHomeTile",
+                      target: "leavingHome",
+                    },
+                  ],
+                },
                 entry: [
                   send(
                     (ctx) => ({
@@ -1087,34 +1140,6 @@ const GhostMachine = createMachine(
                     { to: "ticker" }
                   ),
                 ],
-                states: {
-                  ideal: {
-                    on: {
-                      MOVEMENT_FINISHED: [
-                        {
-                          cond: "reachedHomeTile",
-                          target: "#chaseStatus.normal.hist",
-                        },
-                      ],
-                    },
-                  },
-                  waitingScatter: {
-                    MOVEMENT_FINISHED: [
-                      {
-                        cond: "reachedHomeTile",
-                        target: "#chaseStatus.scatter",
-                      },
-                    ],
-                  },
-                  waitingChase: {
-                    MOVEMENT_FINISHED: [
-                      {
-                        cond: "reachedHomeTile",
-                        target: "#chaseStatus.chase",
-                      },
-                    ],
-                  },
-                },
               },
             },
           },

@@ -718,7 +718,7 @@ const parent = createMachine(
                 states: {
                   normal: {
                     id: "normalChaseMode",
-                    initial: "scatter",
+                    initial: "scatterChaseMemory",
                     on: {
                       FRIGHTENED: {
                         target: "frightened",
@@ -733,19 +733,23 @@ const parent = createMachine(
                       },
                     },
                     states: {
+                      scatterChaseMemory: {
+                        type: "history",
+                        target: "chase",
+                      },
                       scatter: {
+                        entry: ["notifyScatterMode"],
                         on: {
                           CHASE: {
                             target: "chase",
-                            actions: ["notifyChaseMode"],
                           },
                         },
                       },
                       chase: {
+                        entry: ["notifyChaseMode"],
                         on: {
                           SCATTER: {
                             target: "scatter",
-                            actions: ["notifyScatterMode"],
                           },
                         },
                       },
