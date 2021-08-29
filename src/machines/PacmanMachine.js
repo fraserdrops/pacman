@@ -5,11 +5,13 @@ import {
   assign,
   actions,
   sendParent,
+  forwardTo,
 } from "xstate";
 import { getTileType } from "../shared/maze";
 import { Howl, Howler } from "howler";
+import CharacterSpeedMachine from "./CharacterSpeedMachine";
 
-const { raise, respond } = actions;
+const { raise, respond, choose } = actions;
 
 const every = (...guards) => ({
   type: "every",
@@ -26,8 +28,8 @@ const MAX_ROW_OFFSET = 7;
 const CENTER_COL_OFFSET = 3;
 const CENTER_ROW_OFFSET = 4;
 
-const getProjectedPosition = (current, direction, ignoreOffsets) => {
-  const { row, col, rowOffset, colOffset } = current;
+const getProjectedPosition = (currentPosition, direction, ignoreOffsets) => {
+  const { row, col, rowOffset, colOffset } = currentPosition;
   let nextRow = row;
   let nextCol = col;
   let nextRowOffset = rowOffset;
@@ -142,419 +144,262 @@ const getNextPositionWhileCornering = (position, corneringDirections) => {
   };
 };
 
-const PacmanMachine = createMachine(
+const PacmanSpeedMachine = createMachine(
   {
-    id: "pacman",
-    initial: "ready",
+    id: "PacmanSpeed",
     context: {
-      position: {
-        row: 1,
-        col: 1,
-        rowOffset: 4,
-        colOffset: 4,
-      },
-      direction: "left",
-      corneringDirections: {},
-      requestedDirection: "left",
-      nextPosition: {},
-      speed: {},
-      vals: [],
-      subscription: {},
-      maze: [],
       framesToSkip: 0,
-      config: {
-        baseSpeed: 50,
-        speedPercentage: {
-          frightened: 0.8,
-          normal: 0.9,
-        },
-      },
+      speed: 1000,
+      currentBaseInterval: 100,
     },
     on: {
-      GAME_SYNC: {
-        actions: ["respondWithUpdatedPosition"],
+      "*": {
+        actions: [forwardTo("speed")],
+      },
+      SKIP_FRAMES: {
+        target: ".skipFrames",
+        actions: ["setFramesToSkip"],
       },
     },
+    invoke: {
+      src: CharacterSpeedMachine,
+      id: "speed",
+      data: {
+        currentBaseInterval: (ctx, event) => ctx.currentBaseInterval,
+        callbackEventName: "TICK",
+      },
+    },
+    initial: "fullSpeed",
     states: {
-      ready: {
+      fullSpeed: {
         on: {
-          START: {
-            target: "playing",
+          TICK: {
+            actions: [sendParent({ type: "TICK" })],
           },
         },
       },
-      playing: {
-        tags: ["playing"],
-        type: "parallel",
+      skipFrames: {
         on: {
-          LEFT: {
-            actions: [{ type: "requestDirection", direction: "left" }],
-          },
-          UP: {
-            actions: [{ type: "requestDirection", direction: "up" }],
-          },
-          DOWN: {
-            actions: [{ type: "requestDirection", direction: "down" }],
-          },
-          RIGHT: {
-            actions: [{ type: "requestDirection", direction: "right" }],
-          },
-        },
-        states: {
-          movement: {
-            id: "movement",
-            initial: "normalMovement",
-            states: {
-              normalMovement: {
-                id: "normalMovement",
-                initial: "ready",
-                states: {
-                  ready: {
-                    on: {
-                      MOVE: {
-                        target: "checkMovementType",
-                        actions: ["updatePosition"],
-                      },
-                    },
-                  },
-                  checkMovementType: {
-                    always: [
-                      {
-                        cond: every(
-                          "turnRequested",
-                          "pacmanTurningWouldNotCollideWithWall",
-                          "pacmanTilePositionAllowsCornering"
-                        ),
-                        target: "#movement.cornering",
-                        actions: ["setCorneringDirections"],
-                      },
-                      {
-                        cond: every(
-                          "turnRequested",
-                          "pacmanTurningWouldNotCollideWithWall",
-                          "pacmanInCenterOfTile"
-                        ),
-                        target: "#movement.turning",
-                      },
-                      {
-                        cond: "reverseRequested",
-                        target: "#movement.reversing",
-                      },
-                      {
-                        cond: every(
-                          "pacmanInCenterOfTile",
-                          "pacmanWillHitWall"
-                        ),
-                        target: "#movement.walled",
-                      },
-                      { target: "ready" },
-                    ],
-                  },
-                },
-                on: {
-                  START_CORNERING: {
-                    target: "cornering",
-                    actions: ["setCorneringDirections"],
-                  },
-                  START_TURNING: {
-                    target: "turning",
-                  },
-                },
-              },
-              turning: {
-                always: {
-                  target: "normalMovement",
-                  actions: ["turn"],
-                },
-              },
-              cornering: {
-                initial: "ready",
-                states: {
-                  ready: {
-                    on: {
-                      MOVE: {
-                        target: "checkStillCornering",
-                        actions: ["updatePositionWhileCornering"],
-                      },
-                    },
-                  },
-                  checkStillCornering: {
-                    always: [
-                      {
-                        cond: "stillCornering",
-                        target: "ready",
-                      },
-                      {
-                        target: "#normalMovement",
-                        actions: ["turn"],
-                      },
-                    ],
-                  },
-                },
-              },
-              reversing: {
-                always: {
-                  target: "normalMovement",
-                  actions: ["reverse"],
-                },
-              },
-              walled: {
-                tags: ["walled"],
-                initial: "ready",
-                states: {
-                  ready: {
-                    on: {
-                      MOVE: {
-                        target: "checkMovementType",
-                      },
-                    },
-                  },
-                  checkMovementType: {
-                    always: [
-                      {
-                        cond: every(
-                          "turnRequested",
-                          "pacmanTurningWouldNotCollideWithWall",
-                          "pacmanInCenterOfTile"
-                        ),
-                        target: "#movement.turning",
-                      },
-                      {
-                        cond: "reverseRequested",
-                        target: "#movement.reversing",
-                      },
-                      {
-                        cond: every(
-                          "pacmanInCenterOfTile",
-                          "pacmanWillHitWall"
-                        ),
-                        target: "#movement.walled",
-                      },
-                      { target: "#normalMovement.ready" },
-                    ],
-                  },
-                },
-              },
+          TICK: [
+            {
+              cond: "noMoreFramesToSkip",
+              actions: ["decrementFramesToSkip"],
+              target: "fullSpeed",
             },
-          },
-          pelletConsumption: {
-            id: "pelletConsumption",
-            on: {
-              EAT_PELLET: {
-                target: "#pelletConsumption.eatingPellet",
-                actions: [
-                  "setFramesToSkipTo1",
-                  () => {
-                    var sound = new Howl({
-                      src: "https://vgmsite.com/soundtracks/pac-man-game-sound-effects/knwtmadt/Chomp.mp3",
-                      html5: true, // A live stream can only be played through HTML5 Audio.
-                      format: ["mp3", "aac"],
-                    });
-                    sound.play();
-                  },
-                ],
-              },
-              EAT_POWER_PELLET: {
-                target: "#pelletConsumption.eatingPowerPellet",
-                actions: ["setFramesToSkipTo3"],
-              },
+            {
+              actions: ["decrementFramesToSkip"],
             },
-            initial: "hungry",
-            states: {
-              hungry: {
-                on: {
-                  TICK: {
-                    actions: ["allowMovement"],
-                  },
-                },
-              },
-              eatingPellet: {
-                on: {
-                  TICK: [
-                    {
-                      cond: "noMoreFramesToSkip",
-                      actions: ["decrementFramesToSkip"],
-                      target: "hungry",
-                    },
-                    {
-                      actions: ["decrementFramesToSkip"],
-                    },
-                  ],
-                },
-              },
-              eatingPowerPellet: {
-                on: {
-                  TICK: [
-                    {
-                      cond: "noMoreFramesToSkip",
-                      actions: ["decrementFramesToSkip"],
-                      target: "hungry",
-                    },
-                    {
-                      actions: ["decrementFramesToSkip"],
-                    },
-                  ],
-                },
-              },
-            },
-          },
-          speed: {
-            initial: "regular",
-            states: {
-              regular: {
-                on: {
-                  FRIGHTENED: {
-                    target: "frightened",
-                  },
-                },
-                invoke: {
-                  id: "tick",
-                  src: (ctx) => (callback) => {
-                    const updateRate =
-                      1000 /
-                      (ctx.config.speedPercentage.normal *
-                        ctx.config.baseSpeed);
-                    const interval = setInterval(() => {
-                      callback("TICK");
-                    }, updateRate);
-
-                    return () => {
-                      clearInterval(interval);
-                    };
-                  },
-                },
-              },
-              frightened: {
-                initial: "playing",
-                on: {
-                  END_FRIGHT: {
-                    target: "regular",
-                  },
-                },
-                states: {
-                  playing: {
-                    invoke: {
-                      id: "tick",
-                      src: (ctx) => (callback) => {
-                        const updateRate =
-                          1000 /
-                          (ctx.config.speedPercentage.frightened *
-                            ctx.config.baseSpeed);
-                        const interval = setInterval(() => {
-                          callback("TICK");
-                        }, updateRate);
-
-                        return () => {
-                          clearInterval(interval);
-                        };
-                      },
-                    },
-                    on: {
-                      PAUSE: {
-                        target: "paused",
-                      },
-                    },
-                  },
-                  paused: {
-                    tags: ["frightPaused"],
-                    on: {
-                      RESUME: {
-                        target: "playing",
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      paused: {
-        on: {
-          LOSE_LIFE: {
-            target: "dying",
-          },
-          RESUME: {
-            target: "playing",
-          },
-        },
-      },
-      dying: {
-        tags: ["dying"],
-        after: {
-          3000: {
-            target: "waitingToRestart",
-          },
-        },
-      },
-      waitingToRestart: {
-        on: {
-          RESET_POSITION: {
-            target: "ready",
-            actions: ["clearFramesToSkip", "setPosition"],
-          },
+          ],
         },
       },
     },
   },
   {
     actions: {
-      allowMovement: send({ type: "MOVE" }),
-      turn: assign((ctx) => {
-        return {
-          ...ctx,
-          direction: ctx.requestedDirection,
-          requestedDirection: undefined,
-        };
-      }),
-      reverse: assign((ctx) => {
-        return {
-          ...ctx,
-          direction: ctx.requestedDirection,
-          requestedDirection: undefined,
-        };
-      }),
-      requestDirection: assign({
-        requestedDirection: (ctx, event, { action }) => {
-          return action.direction;
-        },
-      }),
-      clearFramesToSkip: assign({
-        framesToSkip: 0,
+      setFramesToSkip: assign({
+        framesToSkip: (ctx, event) => event.framesToSkip,
       }),
       decrementFramesToSkip: assign({
         framesToSkip: (ctx) => ctx.framesToSkip - 1,
       }),
-      setFramesToSkipTo3: assign({ framesToSkip: () => 3 }),
-      setFramesToSkipTo1: assign({ framesToSkip: () => 1 }),
-      updatePosition: assign({
-        position: (ctx) => {
-          return getNextPosition(ctx.position, ctx.direction, ctx.maze, false);
-        },
-      }),
-      respondWithUpdatedPosition: sendParent((ctx) => {
-        return {
-          type: "UPDATE_POSITION",
-          position: ctx.position,
-          direction: ctx.direction,
-          requestedDirection: ctx.requestedDirection,
-          character: "pacman",
-        };
-      }),
-      setPosition: assign({
-        position: (ctx, event) => event.position,
-      }),
-      setCorneringDirections: assign({
-        corneringDirections: (ctx) => ({
-          current: ctx.direction,
-          next: ctx.requestedDirection,
-        }),
-      }),
-      updatePositionWhileCornering: assign({
-        position: (ctx) =>
-          getNextPositionWhileCornering(ctx.position, ctx.corneringDirections),
-      }),
     },
+    guards: {
+      noMoreFramesToSkip: (ctx) => ctx.framesToSkip === 1,
+    },
+  }
+);
+
+// on: {
+//   '*': [
+//     { target: 'place', cond: (_, e) => e.type === 'NEXT' }
+//   ]
+// }
+
+const MovementMachine = createMachine(
+  {
+    id: "movement",
+    context: {
+      position: undefined,
+      maze: undefined,
+      direction: "left",
+      nextDirection: "left",
+      requestedDirection: undefined,
+      config: {},
+    },
+    on: {
+      REQUEST_CHANGE_DIRECTION: {
+        actions: ["requestDirection"],
+      },
+      UPDATE_NEXT_DIRECTION: {
+        actions: ["updateNextDirection"],
+      },
+      // PAUSE: {
+      //   target: ".paused",
+      // },
+      REMOVE_SPECIAL_SPEED: {
+        actions: [forwardTo("speed")],
+      },
+      SPECIAL_SPEED: {
+        actions: [forwardTo("speed")],
+      },
+      CLEAR_SPEED_OVERRIDE: {
+        actions: [forwardTo("speed")],
+      },
+      OVERRIDE_SPEED: {
+        actions: [forwardTo("speed")],
+      },
+      CHANGE_DIRECTION: {},
+      SKIP_FRAMES: {
+        actions: [forwardTo("speed")],
+      },
+    },
+    invoke: {
+      src: PacmanSpeedMachine,
+      id: "speed",
+      data: {
+        currentBaseInterval: (ctx, event) =>
+          1000 / (ctx.config.speedPercentage.normal * ctx.config.baseSpeed),
+        callbackEventName: "TICK",
+      },
+    },
+    initial: "normalMovement",
+    states: {
+      normalMovement: {
+        entry: (ctx, event) => console.log("normal movement", ctx),
+        id: "normalMovement",
+        initial: "ready",
+        states: {
+          ready: {
+            on: {
+              TICK: {
+                target: "checkMovementType",
+                actions: [
+                  "updatePosition",
+                  "respondWithUpdatedPosition",
+                  (ctx) => console.log("UPUOUO", ctx),
+                ],
+              },
+            },
+          },
+          checkMovementType: {
+            always: [
+              {
+                cond: every(
+                  "turnRequested",
+                  "pacmanTurningWouldNotCollideWithWall",
+                  "pacmanTilePositionAllowsCornering"
+                ),
+                target: "#movement.cornering",
+                actions: ["setCorneringDirections"],
+              },
+              {
+                cond: every(
+                  "turnRequested",
+                  "pacmanTurningWouldNotCollideWithWall",
+                  "pacmanInCenterOfTile"
+                ),
+                target: "#movement.turning",
+              },
+              {
+                cond: "reverseRequested",
+                target: "#movement.reversing",
+              },
+              {
+                cond: every("pacmanInCenterOfTile", "pacmanWillHitWall"),
+                target: "#movement.walled",
+              },
+              { target: "ready" },
+            ],
+          },
+        },
+        on: {
+          START_CORNERING: {
+            target: "cornering",
+            actions: ["setCorneringDirections"],
+          },
+          START_TURNING: {
+            target: "turning",
+          },
+        },
+      },
+      turning: {
+        always: {
+          target: "normalMovement",
+          actions: ["turn"],
+        },
+      },
+      cornering: {
+        initial: "ready",
+        states: {
+          ready: {
+            on: {
+              TICK: {
+                target: "checkStillCornering",
+                actions: [
+                  "updatePositionWhileCornering",
+                  "respondWithUpdatedPosition",
+                ],
+              },
+            },
+          },
+          checkStillCornering: {
+            always: [
+              {
+                cond: "stillCornering",
+                target: "ready",
+              },
+              {
+                target: "#normalMovement",
+                actions: ["turn"],
+              },
+            ],
+          },
+        },
+      },
+      reversing: {
+        always: {
+          target: "normalMovement",
+          actions: ["reverse"],
+        },
+      },
+      walled: {
+        initial: "ready",
+        entry: [send("WALLED")],
+        states: {
+          ready: {
+            on: {
+              TICK: {
+                target: "checkMovementType",
+              },
+            },
+          },
+          checkMovementType: {
+            always: [
+              {
+                cond: every(
+                  "turnRequested",
+                  "pacmanTurningWouldNotCollideWithWall",
+                  "pacmanInCenterOfTile"
+                ),
+                target: "#movement.turning",
+              },
+              {
+                cond: "reverseRequested",
+                target: "#movement.reversing",
+              },
+              {
+                cond: every("pacmanInCenterOfTile", "pacmanWillHitWall"),
+                target: "#movement.walled",
+              },
+              { target: "#normalMovement.ready" },
+            ],
+          },
+        },
+        exit: [send("UNWALLED")],
+      },
+    },
+  },
+  {
     guards: {
       get every() {
         return (ctx, event, { cond }) => {
@@ -562,7 +407,6 @@ const PacmanMachine = createMachine(
           return guards.every((guardKey) => this[guardKey](ctx, event));
         };
       },
-      noMoreFramesToSkip: (ctx) => ctx.framesToSkip === 1,
       turnRequested: (ctx) => {
         // a turn is a 90 degree change of direction e.g. up to left
         const { requestedDirection, direction } = ctx;
@@ -649,6 +493,326 @@ const PacmanMachine = createMachine(
         if (next === "left" || next === "right") {
           return rowOffset !== CENTER_ROW_OFFSET;
         }
+      },
+    },
+    actions: {
+      sendMovementFinished: sendParent((ctx) => ({
+        type: "MOVEMENT_FINISHED",
+        position: ctx.position,
+        direction: ctx.direction,
+      })),
+      chooseNextDirection: send(
+        (ctx, event) => {
+          const { maze, position, direction, targetTile } = ctx;
+          return {
+            type: "CALCULATE_NEXT_DIRECTION",
+            maze,
+            position,
+            direction,
+            targetTile,
+          };
+        },
+        { to: "direction" }
+      ),
+      forwardNextPosition: sendParent((ctx) => {
+        return {
+          type: "UPDATE_POSITION",
+          position: ctx.position,
+          direction: ctx.direction,
+        };
+      }),
+      switchToNextDirection: assign({
+        direction: (ctx) => ctx.nextDirection,
+      }),
+      updateNextDirection: assign({
+        nextDirection: (ctx, event) => event.nextDirection,
+      }),
+      setNextPosition: assign({
+        position: (ctx) => getProjectedPosition(ctx.position, ctx.direction),
+      }),
+      turn: assign((ctx) => {
+        return {
+          ...ctx,
+          direction: ctx.requestedDirection,
+          requestedDirection: undefined,
+        };
+      }),
+      reverse: assign((ctx) => {
+        return {
+          ...ctx,
+          direction: ctx.requestedDirection,
+          requestedDirection: undefined,
+        };
+      }),
+      requestDirection: assign({
+        requestedDirection: (ctx, event) => {
+          return event.direction;
+        },
+      }),
+      updatePosition: assign({
+        position: (ctx) => {
+          return getNextPosition(ctx.position, ctx.direction, ctx.maze, false);
+        },
+      }),
+      respondWithUpdatedPosition: sendParent((ctx) => {
+        return {
+          type: "UPDATE_POSITION",
+          position: ctx.position,
+          direction: ctx.direction,
+          requestedDirection: ctx.requestedDirection,
+          character: "pacman",
+        };
+      }),
+      setPosition: assign({
+        position: (ctx, event) => event.position,
+      }),
+      setCorneringDirections: assign({
+        corneringDirections: (ctx) => ({
+          current: ctx.direction,
+          next: ctx.requestedDirection,
+        }),
+      }),
+      updatePositionWhileCornering: assign({
+        position: (ctx) =>
+          getNextPositionWhileCornering(ctx.position, ctx.corneringDirections),
+      }),
+    },
+  }
+);
+
+const PacmanMachine = createMachine(
+  {
+    id: "pacman",
+    context: {
+      position: {
+        row: 1,
+        col: 1,
+        rowOffset: 4,
+        colOffset: 4,
+      },
+      direction: "left",
+      corneringDirections: {},
+      requestedDirection: "left",
+      nextPosition: {},
+      speed: {},
+      vals: [],
+      subscription: {},
+      maze: [],
+      framesToSkip: 0,
+      config: {
+        baseSpeed: 50,
+        speedPercentage: {
+          frightened: 0.8,
+          normal: 0.9,
+        },
+      },
+    },
+    type: "parallel",
+    states: {
+      core: {
+        initial: "ready",
+        on: {
+          GAME_SYNC: {
+            actions: ["respondWithUpdatedPosition"],
+          },
+        },
+        states: {
+          ready: {
+            entry: [() => console.log("ready")],
+
+            on: {
+              START: {
+                target: "playing",
+                actions: [() => console.log("START")],
+              },
+            },
+          },
+          playing: {
+            entry: [() => console.log("PLAYING")],
+            invoke: {
+              src: MovementMachine,
+              id: "movement",
+              data: {
+                position: (ctx, event) => ctx.position,
+                direction: (ctx, event) => ctx.direction,
+                config: (ctx, event) => ctx.config,
+                maze: (ctx, event) => ctx.maze,
+                nextDirection: (ctx, event) => ctx.nextDirection,
+              },
+            },
+            on: {
+              LEFT: {
+                actions: ["requestDirectionLeft"],
+              },
+              UP: {
+                actions: ["requestDirectionUp"],
+              },
+              DOWN: {
+                actions: ["requestDirectionDown"],
+              },
+              RIGHT: {
+                actions: ["requestDirectionRight"],
+              },
+              EAT_PELLET: {
+                actions: ["setFramesToSkipTo1"],
+              },
+              EAT_POWER_PELLET: {
+                actions: ["setFramesToSkipTo3"],
+              },
+              UPDATE_POSITION: {
+                actions: ["updatePacmanPosition"],
+              },
+            },
+          },
+          paused: {
+            on: {
+              LOSE_LIFE: {
+                target: "dying",
+              },
+              RESUME: {
+                target: "playing",
+              },
+            },
+          },
+          dying: {
+            after: {
+              3000: {
+                target: "waitingToRestart",
+              },
+            },
+          },
+          waitingToRestart: {
+            on: {
+              RESET_POSITION: {
+                target: "ready",
+                actions: ["clearFramesToSkip", "setPosition"],
+              },
+            },
+          },
+        },
+      },
+      view: {
+        initial: "stationary",
+        on: {
+          HIDE_PACMAN: {
+            target: ".hidden",
+          },
+          LOSE_LIFE: {
+            target: ".dying",
+          },
+        },
+        states: {
+          stationary: {
+            tags: ["stationary"],
+            on: {
+              START: {
+                target: "moving",
+              },
+              UNWALLED: {
+                target: "moving",
+              },
+            },
+          },
+          moving: {
+            tags: ["moving"],
+            on: {
+              WALLED: {
+                target: "stationary",
+              },
+            },
+          },
+          hidden: {
+            tags: ["frightPaused"],
+          },
+          dying: {
+            tags: ["dying"],
+          },
+        },
+      },
+      audio: {
+        on: {
+          EAT_PELLET: {
+            actions: [
+              () => {
+                var sound = new Howl({
+                  src: "https://vgmsite.com/soundtracks/pac-man-game-sound-effects/knwtmadt/Chomp.mp3",
+                  html5: true, // A live stream can only be played through HTML5 Audio.
+                  format: ["mp3", "aac"],
+                });
+                sound.play();
+              },
+            ],
+          },
+        },
+      },
+    },
+  },
+  {
+    actions: {
+      updatePacmanPosition: assign((ctx, event) => {
+        return {
+          ...ctx,
+          direction: event.direction,
+          position: event.position,
+        };
+      }),
+      requestDirectionLeft: send(
+        { type: "REQUEST_CHANGE_DIRECTION", direction: "left" },
+        { to: "movement" }
+      ),
+      requestDirectionRight: send(
+        { type: "REQUEST_CHANGE_DIRECTION", direction: "right" },
+        { to: "movement" }
+      ),
+      requestDirectionUp: send(
+        { type: "REQUEST_CHANGE_DIRECTION", direction: "up" },
+        { to: "movement" }
+      ),
+      requestDirectionDown: send(
+        { type: "REQUEST_CHANGE_DIRECTION", direction: "down" },
+        { to: "movement" }
+      ),
+      setFramesToSkipTo1: send(
+        { type: "SKIP_FRAMES", framesToSkip: 1 },
+        { to: "movement" }
+      ),
+      setFramesToSkipTo3: send(
+        { type: "SKIP_FRAMES", framesToSkip: 3 },
+        { to: "movement" }
+      ),
+      updatePosition: assign({
+        position: (ctx) => {
+          return getNextPosition(ctx.position, ctx.direction, ctx.maze, false);
+        },
+      }),
+      respondWithUpdatedPosition: sendParent((ctx) => {
+        return {
+          type: "UPDATE_POSITION",
+          position: ctx.position,
+          direction: ctx.direction,
+          requestedDirection: ctx.requestedDirection,
+          character: "pacman",
+        };
+      }),
+      setPosition: assign({
+        position: (ctx, event) => event.position,
+      }),
+      changeToFrightSpeed: send((ctx) => ({
+        type: "CHANGE_SPEED",
+        intervalMS:
+          ctx.config.speedPercentage.frightened * ctx.config.baseSpeed,
+      })),
+      changeToNormalSpeed: send((ctx) => ({
+        type: "CHANGE_SPEED",
+        intervalMS: ctx.config.speedPercentage.normal * ctx.config.baseSpeed,
+      })),
+    },
+    guards: {
+      get every() {
+        return (ctx, event, { cond }) => {
+          const { guards } = cond;
+          return guards.every((guardKey) => this[guardKey](ctx, event));
+        };
       },
     },
   }

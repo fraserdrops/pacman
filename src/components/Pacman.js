@@ -30,11 +30,11 @@ const Pacman = React.memo((props) => {
     return null;
   }
 
-  if (state.hasTag("frightPaused")) {
+  if (state.hasTag("hidden")) {
     return null;
   }
 
-  const showEating = state.hasTag("playing") && !state.hasTag("walled");
+  const showEating = state.hasTag("moving");
   const showDying = state.hasTag("dying");
 
   let radius = 4;
