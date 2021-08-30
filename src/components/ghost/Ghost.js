@@ -24,11 +24,7 @@ const Ghost = React.memo((props) => {
       position.row * tileSize + position.rowOffset - tileSize / 2 - 1
     }), scale(0.9, 0.9)`}
     >
-      {(state.hasTag("normal") ||
-        state.hasTag("ready") ||
-        state.hasTag("atHome") ||
-        state.hasTag("init") ||
-        state.hasTag("leavingHome")) && (
+      {state.hasTag("regular") && (
         <NormalGhost
           color={color}
           position={position}
