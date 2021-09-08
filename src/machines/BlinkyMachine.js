@@ -283,7 +283,6 @@ const GhostMachine = createMachine(
       }),
     },
     guards: {
-      noMoreFramesToSkip: (ctx) => ctx.framesToSkip === 1,
       canChangeDirection: (ctx) => {
         const { position } = ctx;
         return position.rowOffset === 4 && position.colOffset === 4;

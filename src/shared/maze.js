@@ -1152,14 +1152,14 @@ maze1Tiles.forEach((row, rowIndex) => {
 export const maze1 = {
   tiles: maze1Tiles,
   zones: {
-    red: [
+    redZones: [
       {
         start: { row: 14, col: 11 },
         end: { row: 14, col: 15 },
       },
       {
-        start: { row: 14, col: 11 },
-        end: { row: 14, col: 15 },
+        start: { row: 26, col: 11 },
+        end: { row: 26, col: 15 },
       },
     ],
     tunnels: [
@@ -1173,8 +1173,12 @@ export const maze1 = {
       },
     ],
     ghostHouse: {
-      start: { row: 15, col: 11 },
-      end: { row: 18, col: 15 },
+      start: { row: 16, col: 11 },
+      end: { row: 18, col: 16 },
+    },
+    ghostHouseEntrance: {
+      start: { row: 15, col: 13 },
+      end: { row: 15, col: 14 },
     },
   },
   pelletsRemaining: maze1PelletsRemaining,

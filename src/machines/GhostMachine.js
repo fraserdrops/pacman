@@ -1,349 +1,17 @@
-import {
-  createMachine,
-  spawn,
-  assign,
-  actions,
-  send,
-  sendParent,
-  forwardTo,
-} from "xstate";
-import { getTileType } from "../shared/maze";
-import { tileToString } from "../util/mazeUtil";
-import CharacterSpeedMachine from "./CharacterSpeedMachine";
-
-const { raise, respond, choose } = actions;
-
-let directions = ["up", "left", "down", "right"];
-
-const MIN_COL_OFFSET = 0;
-const MAX_COL_OFFSET = 7;
-const MIN_ROW_OFFSET = 0;
-const MAX_ROW_OFFSET = 7;
-
-const CENTER_COL_OFFSET = 3;
-const CENTER_ROW_OFFSET = 4;
+import { actions, assign, createMachine, send } from "xstate";
+import { isPositionWithinZone } from "../util/characterUtil";
+import GhostMovementMachine from "./GhostMovementMachine";
+const { raise, respond, choose, pure } = actions;
 
 const every = (...guards) => ({
   type: "every",
   guards,
 });
 
-const RED_ZONE_ROW = 14;
-const RED_ZONE_START_COL = 11;
-const RED_ZONE_END_COL = 13;
-
 const not = (guard) => ({
   type: "not",
   guard,
 });
-
-const DirectionMachine = createMachine(
-  {
-    id: "Direction",
-    initial: "applyDirectionRestrictions",
-    context: {
-      restrictedTiles: {},
-      restrictedDirections: [],
-    },
-    on: {
-      ADD_RESTRICTED_TILES: {
-        actions: ["addRestrictedTiles"],
-      },
-      REMOVE_RESTRICTED_TILES: {
-        actions: ["removeRestrictedTiles"],
-      },
-      ADD_RESTRICTED_DIRECTIONS: {
-        actions: ["addRestrictedDirections"],
-      },
-      REMOVE_RESTRICTED_DIRECTIONS: {
-        actions: ["removeRestrictedDirections"],
-      },
-    },
-    states: {
-      applyDirectionRestrictions: {
-        on: {
-          CALCULATE_NEXT_DIRECTION: {
-            actions: ["chooseDirectionsWithRestrictions"],
-          },
-        },
-      },
-      ignoreDirectionRestrictions: {
-        on: {
-          CLEAR_OVERRIDE: {
-            target: "applyDirectionRestrictions",
-            actions: ["changeSpeedWithMultipliers"],
-          },
-          CALCULATE_NEXT_DIRECTION: {
-            actions: ["chooseDirectionsNoRestrictions"],
-          },
-        },
-      },
-    },
-  },
-  {
-    actions: {
-      chooseDirectionsWithRestrictions: sendParent((ctx, event) => {
-        const { maze, position, direction, targetTile } = event;
-        const { restrictedDirections, restrictedTiles } = ctx;
-        const nextDirection = chooseNextDirection({
-          maze,
-          position,
-          direction,
-          targetTile,
-          restrictedDirections,
-          restrictedTiles,
-        });
-
-        return { type: "UPDATE_NEXT_DIRECTION", nextDirection };
-      }),
-      chooseDirectionsNoRestrictions: sendParent((ctx, event) => {
-        const { maze, position, direction, targetTile } = event;
-        const nextDirection = chooseNextDirection({
-          maze,
-          position,
-          direction,
-          targetTile,
-          restrictedDirections: [],
-          restrictedTiles: {},
-        });
-
-        return { type: "UPDATE_NEXT_DIRECTION", nextDirection };
-      }),
-      addRestrictedTiles: assign({
-        restrictedTiles: (ctx, event) => {
-          const restrictedTiles = { ...ctx.restrictedTiles };
-          event.tiles.forEach(
-            (tile) => (restrictedTiles[tileToString(event.tile)] = tile)
-          );
-          return restrictedTiles;
-        },
-      }),
-      removeRestrictedTiles: assign({
-        restrictedTiles: (ctx, event) => {
-          const newRestrictedTiles = { ...ctx.restrictedTiles };
-          event.tiles.forEach(
-            (tile) => delete newRestrictedTiles[tileToString(tile)]
-          );
-          return newRestrictedTiles;
-        },
-      }),
-      addRestrictedDirections: assign({
-        restrictedDirections: (ctx, event) => {
-          return [...ctx.restrictedDirections, ...event.directions];
-        },
-      }),
-      removeRestrictedDirections: assign({
-        restrictedDirections: (ctx, event) => {
-          return ctx.restrictedDirections.filter(
-            (direction) => !event.directions.includes(direction)
-          );
-        },
-      }),
-    },
-  }
-);
-
-const MovementMachine = createMachine(
-  {
-    id: "Movement",
-    context: {
-      position: undefined,
-      maze: undefined,
-      direction: "left",
-      nextDirection: "left",
-      targetTile: undefined,
-      gameConfig: {},
-    },
-    on: {
-      ENTER_RED_ZONE: {
-        actions: ["applyRedZoneRestrictions"],
-      },
-      EXIT_RED_ZONE: {
-        actions: ["removeRedZoneRestrictions"],
-      },
-      UPDATE_NEXT_DIRECTION: {
-        actions: ["updateNextDirection"],
-      },
-      PAUSE: {
-        target: ".paused",
-      },
-      CHANGE_TARGET_TILE: {
-        actions: ["setTargetTile"],
-      },
-      REMOVE_SPECIAL_SPEED: {
-        actions: [forwardTo("speed")],
-      },
-      SPECIAL_SPEED: {
-        actions: [forwardTo("speed")],
-      },
-      CLEAR_SPEED_OVERRIDE: {
-        actions: [forwardTo("speed")],
-      },
-      OVERRIDE_SPEED: {
-        actions: [forwardTo("speed")],
-      },
-      ADD_RESTRICTED_DIRECTIONS: {
-        actions: [forwardTo("direction")],
-      },
-      REMOVE_RESTRICTED_DIRECTIONS: {
-        actions: [forwardTo("direction")],
-      },
-      ADD_RESTRICTED_TILES: {
-        actions: [forwardTo("direction")],
-      },
-      REMOVE_RESTRICTED_TILES: {
-        actions: [forwardTo("direction")],
-      },
-    },
-    invoke: [
-      {
-        src: CharacterSpeedMachine,
-        id: "speed",
-        data: {
-          currentBaseInterval: (ctx, event) =>
-            1000 /
-            (ctx.gameConfig.speedPercentage.normal * ctx.gameConfig.baseSpeed),
-          callbackEventName: "TICK",
-        },
-      },
-      { src: DirectionMachine, id: "direction" },
-    ],
-    initial: "init",
-    states: {
-      init: {
-        initial: "requestDirection",
-        states: {
-          requestDirection: {
-            always: {
-              target: "waitingForDirection",
-              actions: ["chooseNextDirection"],
-            },
-          },
-          waitingForDirection: {
-            on: {
-              UPDATE_NEXT_DIRECTION: {
-                target: "recievedDirection",
-                actions: ["updateNextDirection"],
-              },
-            },
-          },
-          recievedDirection: {
-            type: "final",
-          },
-        },
-        onDone: {
-          target: "idle",
-        },
-      },
-      idle: {
-        on: {
-          TICK: {
-            target: "updateDirection",
-            actions: ["setNextPosition", "forwardNextPosition"],
-          },
-        },
-      },
-      updateDirection: {
-        always: {
-          target: "idle",
-          actions: [
-            choose([
-              {
-                cond: every(
-                  // "turningWouldNotCollideWithWall",
-                  "inCenterOfTile"
-                ),
-                // when the ghost reaches the center of a tile, it switches to using the next direction it calculated a tile ago,
-                // then looks ahead to choose a direction for when it reachs the next tile
-                actions: ["switchToNextDirection", "chooseNextDirection"],
-              },
-            ]),
-            "sendMovementFinished",
-          ],
-        },
-      },
-      paused: {
-        tags: ["movementPaused"],
-        on: {
-          RESUME: {
-            target: "idle",
-          },
-        },
-      },
-    },
-  },
-  {
-    guards: {
-      get every() {
-        return (ctx, event, { cond }) => {
-          const { guards } = cond;
-          return guards.every((guardKey) => this[guardKey](ctx, event));
-        };
-      },
-      get not() {
-        return (ctx, event, { cond }) => {
-          const { guard } = cond;
-          return !this[guard](ctx, event);
-        };
-      },
-      inCenterOfTile: (ctx) => {
-        // pacman can turn if he is at the center of the current tile
-        const { direction, position } = ctx;
-        const { colOffset, rowOffset } = position;
-        if (direction === "up" || direction === "down") {
-          return rowOffset === CENTER_ROW_OFFSET;
-        }
-
-        if (direction === "left" || direction === "right") {
-          return colOffset === CENTER_COL_OFFSET;
-        }
-      },
-    },
-    actions: {
-      sendMovementFinished: sendParent((ctx) => ({
-        type: "MOVEMENT_FINISHED",
-        targetTile: ctx.targetTile,
-        position: ctx.position,
-        direction: ctx.direction,
-      })),
-      chooseNextDirection: send(
-        (ctx, event) => {
-          const { maze, position, direction, targetTile } = ctx;
-          return {
-            type: "CALCULATE_NEXT_DIRECTION",
-            maze,
-            position,
-            direction,
-            targetTile,
-          };
-        },
-        { to: "direction" }
-      ),
-      forwardNextPosition: sendParent((ctx) => {
-        return {
-          type: "UPDATE_POSITION",
-          position: ctx.position,
-          direction: ctx.direction,
-        };
-      }),
-      switchToNextDirection: assign({
-        direction: (ctx) => ctx.nextDirection,
-      }),
-      updateNextDirection: assign({
-        nextDirection: (ctx, event) => event.nextDirection,
-      }),
-      setNextPosition: assign({
-        position: (ctx) => getProjectedPosition(ctx.position, ctx.direction),
-      }),
-      setTargetTile: assign({
-        targetTile: (ctx, event) => event.targetTile,
-      }),
-    },
-  }
-);
-
-const euclideanDistance = (x1, y1, x2, y2) =>
-  Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
 
 const GhostMachine = createMachine(
   {
@@ -364,9 +32,11 @@ const GhostMachine = createMachine(
         row: 15,
         col: 15,
       },
-      direction: "up",
+      scatterTargeting: undefined,
+      chaseTargeting: undefined,
+      direction: "left",
       scatterModeTile: {},
-      nextDirection: "up",
+      nextDirection: "left",
       speed: {},
       gameState: {},
       subscription: {},
@@ -379,9 +49,9 @@ const GhostMachine = createMachine(
         baseSpeed: 35,
         speedPercentage: {
           tunnel: 0.4,
-          normal: 0.9,
+          normal: 0.75,
           frightened: 0.5,
-          returning: 2,
+          returning: 4,
         },
       },
       ghostConfig: {
@@ -411,8 +81,10 @@ const GhostMachine = createMachine(
               HIDE_DISPLAY: {
                 target: ".hidden",
               },
+              RESET_POSITION: {
+                target: ".regular",
+              },
             },
-
             states: {
               regular: {
                 tags: ["regular"],
@@ -432,6 +104,14 @@ const GhostMachine = createMachine(
               },
               frightEnding: {
                 tags: ["frightEnding"],
+                on: {
+                  SCATTER: {
+                    target: "regular",
+                  },
+                  CHASE: {
+                    target: "regular",
+                  },
+                },
               },
               dead: {
                 tags: ["dead"],
@@ -443,6 +123,11 @@ const GhostMachine = createMachine(
               },
               eyes: {
                 tags: ["returningHome"],
+                on: {
+                  ON_TARGET_TILE: {
+                    target: "regular",
+                  },
+                },
               },
               hidden: {
                 tags: ["hidden"],
@@ -468,8 +153,32 @@ const GhostMachine = createMachine(
             target: ".playing",
             actions: ["setPosition"],
           },
-          HIDE_DISPLAY: {
-            target: ".hidden",
+          PAUSE: {
+            actions: [send("PAUSE", { to: "movement" })],
+          },
+          RESUME: {
+            actions: [send("RESUME", { to: "movement" })],
+          },
+          UPDATE_NORMAL_SPEED: {
+            actions: [
+              assign({
+                gameConfig: (ctx, event) => ({
+                  ...ctx.gameConfig,
+                  speedPercentage: {
+                    ...ctx.gameConfig.speedPercentage,
+                    normal: event.speedPercentage,
+                  },
+                }),
+              }),
+            ],
+          },
+          UPDATE_SCATTER_TARGETING: {
+            actions: [
+              assign({
+                scatterTargeting: (ctx, event) => event.targetingModule,
+              }),
+            ],
+            internal: false,
           },
         },
         states: {
@@ -491,13 +200,17 @@ const GhostMachine = createMachine(
             type: "parallel",
             on: {
               UPDATE_POSITION: { actions: ["setPosition", "setDirection"] },
+              RESET_POSITION: {
+                target: "stopped",
+                actions: ["setPosition", "setDirection"],
+              },
             },
             invoke: {
-              src: MovementMachine,
+              src: GhostMovementMachine,
               id: "movement",
               data: {
                 position: (ctx, event) => ctx.position,
-                nextDirection: (ctx, event) => ctx.position,
+                nextDirection: (ctx, event) => ctx.nextDirection,
                 targetTile: (ctx, event) => ctx.ghostConfig.targetTile,
                 maze: (ctx, event) => ctx.maze,
                 direction: (ctx, event) => ctx.direction,
@@ -643,7 +356,6 @@ const GhostMachine = createMachine(
                           {
                             cond: "inTunnel",
                             target: "inside",
-                            actions: ["applyRedZoneRestrictions"],
                           },
                           {
                             target: "outside",
@@ -657,7 +369,6 @@ const GhostMachine = createMachine(
                             {
                               cond: "inRedZone",
                               target: "inside",
-                              actions: ["applyRedZoneRestrictions"],
                             },
                           ],
                         },
@@ -711,18 +422,31 @@ const GhostMachine = createMachine(
                 id: "chaseStatus",
                 states: {
                   init: {
+                    entry: ["applyRedZoneRestrictions"],
                     on: {
                       INSIDE_GHOST_HOUSE: {
                         target: "atHome",
+                        actions: ["switchToStrobeMovement"],
                       },
                       OUTSIDE_GHOST_HOUSE: {
                         target: "leavingHome",
+                        actions: [
+                          "setTargetTileExitLeft",
+                          "seekTargetTile",
+                          () => console.log("LEFT EXIT"),
+                        ],
                       },
                     },
+                    exit: [send("RESUME", { to: "movement" })],
                   },
                   atHome: {
                     initial: "exitLeft",
-                    entry: ["setHomeTargetTile"],
+                    entry: [
+                      "setHomeTargetTile",
+                      // "applyAtHomeMovementRestrictions",
+                      "blockGhostHouseEntrance",
+                    ],
+                    // exit: ["removeAtHomeMovementRestrictions"],
                     states: {
                       exitLeft: {
                         on: {
@@ -734,7 +458,11 @@ const GhostMachine = createMachine(
                           },
                           LEAVE_HOME: {
                             target: "aboutToLeave",
-                            actions: ["setTargetTileExitLeft"],
+                            actions: [
+                              "setTargetTileExitLeft",
+                              "seekTargetTile",
+                              "unblockGhostHouseEntrance",
+                            ],
                           },
                         },
                       },
@@ -742,7 +470,11 @@ const GhostMachine = createMachine(
                         on: {
                           LEAVE_HOME: {
                             target: "aboutToLeave",
-                            actions: ["setTargetTileExitRight"],
+                            actions: [
+                              "setTargetTileExitRight",
+                              "seekTargetTile",
+                              "unblockGhostHouseEntrance",
+                            ],
                           },
                         },
                       },
@@ -758,12 +490,22 @@ const GhostMachine = createMachine(
                     on: {
                       ON_TARGET_TILE: {
                         target: "normal",
+                        actions: [
+                          "blockGhostHouseEntrance",
+                          () => console.log("REACHED TARGET"),
+                        ],
                       },
                     },
                   },
                   normal: {
-                    DIED: {
-                      target: "dead",
+                    invoke: {
+                      id: "targetingModule",
+                      src: (ctx) => ctx.scatterTargeting,
+                    },
+                    on: {
+                      DIED: {
+                        target: "dead",
+                      },
                     },
                     initial: "checkingGameModeState",
                     states: {
@@ -784,17 +526,21 @@ const GhostMachine = createMachine(
                         ],
                       },
                       chase: {
+                        invoke: {
+                          id: "targetingModule",
+                          src: (ctx) => ctx.ghostConfig.chaseTargeting,
+                        },
                         entry: [
-                          () => console.log("I AM IN CHASE"),
                           send(
                             (ctx) => ({
                               type: "CHANGE_SPEED",
                               intervalMS:
-                                ctx.gameConfig.speedPercentage.normal *
-                                ctx.gameConfig.baseSpeed,
+                                ctx.gameConfig.baseSpeed /
+                                ctx.gameConfig.speedPercentage.normal,
                             }),
                             { to: "movement" }
                           ),
+                          // "calculateTargetTile",
                         ],
                         on: {
                           SCATTER: {
@@ -806,18 +552,53 @@ const GhostMachine = createMachine(
                           TICK: {
                             actions: ["updateTargetTileNormalMode"],
                           },
+                          GAME_SYNC: {
+                            actions: [
+                              "respondWithUpdatedPosition",
+                              "updateGameState",
+                              "calculateTargetTile",
+                            ],
+                          },
+                          UPDATE_NORMAL_SPEED: {
+                            actions: [
+                              assign({
+                                gameConfig: (ctx, event) => ({
+                                  ...ctx.gameConfig,
+                                  speedPercentage: {
+                                    ...ctx.gameConfig.speedPercentage,
+                                    normal: event.speedPercentage,
+                                  },
+                                }),
+                              }),
+                              send(
+                                (ctx) => ({
+                                  type: "CHANGE_SPEED",
+                                  intervalMS:
+                                    ctx.gameConfig.baseSpeed /
+                                    ctx.gameConfig.speedPercentage.normal,
+                                }),
+                                { to: "movement" }
+                              ),
+                            ],
+                          },
+                          NEW_TARGET_TILE: {
+                            actions: ["forwardNewTargetTile"],
+                          },
                         },
                       },
                       scatter: {
+                        invoke: {
+                          id: "targetingModule",
+                          src: (ctx) => ctx.ghostConfig.scatterTargeting,
+                        },
                         entry: [
-                          () => console.log("I AM IN SCATTER"),
                           "setTargetTileScatterMode",
                           send(
                             (ctx) => ({
                               type: "CHANGE_SPEED",
                               intervalMS:
-                                ctx.gameConfig.speedPercentage.normal *
-                                ctx.gameConfig.baseSpeed,
+                                ctx.gameConfig.baseSpeed /
+                                ctx.gameConfig.speedPercentage.normal,
                             }),
                             { to: "movement" }
                           ),
@@ -829,6 +610,47 @@ const GhostMachine = createMachine(
                           FRIGHTENED: {
                             target: "frightened",
                           },
+                          GAME_SYNC: {
+                            actions: [
+                              "respondWithUpdatedPosition",
+                              "updateGameState",
+                              "calculateTargetTile",
+                            ],
+                          },
+                          UPDATE_NORMAL_SPEED: {
+                            actions: [
+                              assign({
+                                gameConfig: (ctx, event) => ({
+                                  ...ctx.gameConfig,
+                                  speedPercentage: {
+                                    ...ctx.gameConfig.speedPercentage,
+                                    normal: event.speedPercentage,
+                                  },
+                                }),
+                              }),
+                              send(
+                                (ctx) => ({
+                                  type: "CHANGE_SPEED",
+                                  intervalMS:
+                                    ctx.gameConfig.baseSpeed /
+                                    ctx.gameConfig.speedPercentage.normal,
+                                }),
+                                { to: "movement" }
+                              ),
+                            ],
+                          },
+                          UPDATE_SCATTER_TARGETING: {
+                            actions: [
+                              assign({
+                                scatterTargeting: (ctx, event) =>
+                                  event.targetingModule,
+                              }),
+                            ],
+                            internal: false,
+                          },
+                          NEW_TARGET_TILE: {
+                            actions: ["forwardNewTargetTile"],
+                          },
                         },
                       },
                       frightened: {
@@ -837,8 +659,8 @@ const GhostMachine = createMachine(
                             (ctx) => ({
                               type: "CHANGE_SPEED",
                               intervalMS:
-                                ctx.gameConfig.speedPercentage.frightened *
-                                ctx.gameConfig.baseSpeed,
+                                ctx.gameConfig.baseSpeed /
+                                ctx.gameConfig.speedPercentage.frightened,
                             }),
                             { to: "movement" }
                           ),
@@ -862,39 +684,49 @@ const GhostMachine = createMachine(
                     on: {
                       RESUME: {
                         target: "returningHome",
-                        actions: ["setHomeTargetTile"],
+                        actions: [
+                          "setHomeTargetTile",
+                          send("RESUME", { to: "movement" }),
+                          send(
+                            (ctx) => ({
+                              type: "CHANGE_SPEED",
+                              intervalMS:
+                                ctx.gameConfig.baseSpeed /
+                                ctx.gameConfig.speedPercentage.returning,
+                            }),
+                            { to: "movement" }
+                          ),
+                          send(
+                            (ctx) => ({
+                              type: "OVERRIDE_SPEED_MULTIPLIERS",
+                            }),
+                            { to: "movement" }
+                          ),
+                          send(
+                            (ctx) => ({
+                              type: "IGNORE_DIRECTION_RESTRICTIONS",
+                            }),
+                            { to: "movement" }
+                          ),
+                        ],
                       },
                     },
                   },
                   returningHome: {
                     on: {
-                      MOVEMENT_FINISHED: [
+                      ON_TARGET_TILE: [
                         {
-                          cond: "reachedHomeTile",
+                          // cond: "reachedHomeTile",
                           target: "leavingHome",
                         },
                       ],
                     },
-                    entry: [
-                      send(
-                        (ctx) => ({
-                          type: "CHANGE_SPEED",
-                          intervalMS:
-                            ctx.gameConfig.speedPercentage.returning *
-                            ctx.gameConfig.baseSpeed,
-                        }),
-                        { to: "ticker" }
-                      ),
-                    ],
                   },
                 },
               },
             },
           },
           paused: {},
-          hidden: {
-            tags: ["hidden"],
-          },
           dying: {},
         },
       },
@@ -911,17 +743,45 @@ const GhostMachine = createMachine(
           nextDirection: ctx.nextDirection,
         };
       }),
-      applyRedZoneRestrictions: send(
-        {
+      switchToStrobeMovement: send("", { to: "movement" }),
+      seekTargetTile: send("SEEK_TARGET_TILE", { to: "movement" }),
+      applyRedZoneRestrictions: pure((ctx) => {
+        return ctx.maze.zones.redZones.map((zone, index) => {
+          return send(
+            (ctx, event) => ({
+              type: "ADD_RESTRICTED_DIRECTIONS",
+              zone,
+              zoneKey: "red" + index,
+              restrictedDirections: ["up"],
+            }),
+            { to: "movement" }
+          );
+        });
+      }),
+      removeRedZoneRestrictions: pure((ctx) => {
+        return ctx.maze.zones.redZones.map((zone, index) => {
+          return send(
+            (ctx, event) => ({
+              type: "REMOVE_RESTRICTED_DIRECTIONS",
+              zoneKey: "red" + index,
+            }),
+            { to: "movement" }
+          );
+        });
+      }),
+      applyAtHomeMovementRestrictions: send(
+        (ctx, event) => ({
           type: "ADD_RESTRICTED_DIRECTIONS",
-          directions: ["left"],
-        },
+          zone: ctx.maze.zones.ghostHouse,
+          zoneKey: "ghostHouse",
+          restrictedDirections: ["left", "right"],
+        }),
         { to: "movement" }
       ),
-      removeRedZoneRestrictions: send(
+      removeAtHomeMovementRestrictions: send(
         {
           type: "REMOVE_RESTRICTED_DIRECTIONS",
-          directions: ["left"],
+          directions: ["left", "right"],
         },
         { to: "movement" }
       ),
@@ -943,10 +803,17 @@ const GhostMachine = createMachine(
       updateGameState: assign({
         gameState: (ctx, event) => event.gameState,
       }),
+      forwardNewTargetTile: send(
+        (ctx, event) => ({
+          type: "CHANGE_TARGET_TILE",
+          targetTile: event.targetTile,
+        }),
+        { to: "movement" }
+      ),
       setTargetTileScatterMode: send(
         (ctx) => ({
           type: "CHANGE_TARGET_TILE",
-          targetTile: { row: 15, col: 15 },
+          targetTile: ctx.ghostConfig.scatterTargetTile,
         }),
         { to: "movement" }
       ),
@@ -981,6 +848,28 @@ const GhostMachine = createMachine(
       sendOnTargetTile: send({ type: "ON_TARGET_TILE" }),
       sendInsideGhostHouse: send({ type: "INSIDE_GHOST_HOUSE" }),
       sendOutsideGhostHouse: send({ type: "OUTSIDE_GHOST_HOUSE" }),
+      calculateTargetTile: send(
+        (ctx, event) => ({
+          type: "CALCULATE_TARGET_TILE",
+          gameState: ctx.gameState,
+        }),
+        { to: "targetingModule" }
+      ),
+      blockGhostHouseEntrance: send(
+        (ctx, event) => ({
+          type: "ADD_FORBIDDEN_ZONE",
+          zone: ctx.maze.zones.ghostHouseEntrance,
+          zoneKey: "ghostHouseEntrance",
+        }),
+        { to: "movement" }
+      ),
+      unblockGhostHouseEntrance: send(
+        (ctx, event) => ({
+          type: "REMOVE_FORBIDDEN_ZONE",
+          zoneKey: "ghostHouseEntrance",
+        }),
+        { to: "movement" }
+      ),
 
       // setTargetTileScatterMode: assign({
       //   targetTile: (ctx) => ctx.ghostConfig.scatterTargetTile,
@@ -1023,185 +912,23 @@ const GhostMachine = createMachine(
       },
       inRedZone: (ctx) => {
         const { position, maze } = ctx;
-        return maze.zones.red.some((redZone) => {
-          return (
-            redZone.start.row <= position.row &&
-            position.row <= redZone.end.row &&
-            redZone.start.col <= position.col &&
-            position.col <= redZone.end.col
-          );
+        return maze.zones.redZones.some((redZone) => {
+          return isPositionWithinZone(position, redZone);
         });
       },
       inTunnel: (ctx) => {
         const { position, maze } = ctx;
         return maze.zones.tunnels.some((tunnel) => {
-          return (
-            tunnel.start.row <= position.row &&
-            position.row <= tunnel.end.row &&
-            tunnel.start.col <= position.col &&
-            position.col <= tunnel.end.col
-          );
+          return isPositionWithinZone(position, tunnel);
         });
       },
       inGhostHouse: (ctx) => {
         const { position, maze } = ctx;
         const { ghostHouse } = maze.zones;
-        return (
-          ghostHouse.start.row <= position.row &&
-          position.row <= ghostHouse.end.row &&
-          ghostHouse.start.col <= position.col &&
-          position.col <= ghostHouse.end.col
-        );
+        return isPositionWithinZone(position, ghostHouse);
       },
     },
   }
 );
-
-function chooseNextDirection({
-  maze,
-  position,
-  direction,
-  targetTile,
-  restrictedTiles,
-  restrictedDirections,
-}) {
-  // the ghosts look one tile ahead and choose what direction they will take when they get to the next tile
-  let validDirections = [...directions].filter(
-    (direction) => !restrictedDirections.includes(direction)
-  );
-  let nextDirection = "up";
-  const nextPosition = getProjectedPosition(
-    { direction, row: position.row, col: position.col },
-    direction,
-    true
-  );
-
-  if (direction === "up") {
-    validDirections = validDirections.filter(
-      (direction) => direction !== "down"
-    );
-  }
-
-  if (direction === "down") {
-    validDirections = validDirections.filter((direction) => direction !== "up");
-  }
-
-  if (direction === "right") {
-    validDirections = validDirections.filter(
-      (direction) => direction !== "left"
-    );
-  }
-
-  validDirections = validDirections.filter((direction) => {
-    const projectedPosition = getProjectedPosition(
-      { row: nextPosition.row, col: nextPosition.col },
-      direction,
-      true
-    );
-    const isWall = getTileType(maze.tiles, projectedPosition) === "wall";
-    const isRestrictedTile = restrictedTiles[tileToString(nextPosition)];
-    return !isWall && !isRestrictedTile;
-  });
-  if (validDirections.length > 1) {
-    // we choose the direction that moves us closer to the target tile
-    // need to find the projected position for each valid direction we could choose
-    const distanceToTargetIfDirectionChosen = validDirections.map(
-      (direction) => {
-        const projectedPosition = getProjectedPosition(
-          { row: nextPosition.row, col: nextPosition.col },
-          direction,
-          true
-        );
-        return euclideanDistance(
-          projectedPosition.row,
-          projectedPosition.col,
-          targetTile.row,
-          targetTile.col
-        );
-      }
-    );
-    let directionsWithShortestDistance = [];
-    let shortestDistance = Number.MAX_SAFE_INTEGER;
-    distanceToTargetIfDirectionChosen.forEach((distance, index) => {
-      if (distance < shortestDistance) {
-        directionsWithShortestDistance = [validDirections[index]];
-        shortestDistance = distance;
-      } else if (distance === shortestDistance) {
-        directionsWithShortestDistance.push(validDirections[index]);
-      }
-    });
-
-    if (directionsWithShortestDistance.length > 1) {
-      // go through directions in order of priority (up left down right), and choose the first match
-      for (let direction of directions) {
-        if (directionsWithShortestDistance.includes(direction)) {
-          nextDirection = direction;
-          break;
-        }
-      }
-    } else {
-      nextDirection = directionsWithShortestDistance[0];
-    }
-  } else {
-    nextDirection = validDirections[0];
-  }
-  return nextDirection;
-}
-
-function getProjectedPosition(current, direction, ignoreOffsets) {
-  const { row, col, rowOffset, colOffset } = current;
-  let nextRow = row;
-  let nextCol = col;
-  let nextRowOffset = rowOffset;
-  let nextColOffset = colOffset;
-  switch (direction) {
-    case "up": {
-      if (rowOffset === 0 || ignoreOffsets) {
-        nextRow = row - 1;
-        nextRowOffset = 7;
-      } else {
-        nextRowOffset = rowOffset - 1;
-      }
-      break;
-    }
-    case "down": {
-      if (rowOffset === 7 || ignoreOffsets) {
-        nextRow = row + 1;
-        nextRowOffset = 0;
-      } else {
-        nextRowOffset = rowOffset + 1;
-      }
-
-      break;
-    }
-    case "left": {
-      if (colOffset === 0 || ignoreOffsets) {
-        nextCol = col - 1;
-        nextColOffset = 7;
-      } else {
-        nextColOffset = colOffset - 1;
-      }
-      break;
-    }
-    case "right": {
-      if (colOffset === 7 || ignoreOffsets) {
-        nextCol = col + 1;
-        nextColOffset = 0;
-      } else {
-        nextColOffset = colOffset + 1;
-      }
-      break;
-    }
-    default: {
-    }
-  }
-
-  return {
-    row: nextRow,
-    col: nextCol,
-    rowOffset: nextRowOffset,
-    colOffset: nextColOffset,
-  };
-}
 
 export default GhostMachine;

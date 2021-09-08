@@ -16,66 +16,80 @@ const Ghost = React.memo((props) => {
   }
 
   return (
-    <g
-      transform={`translate(${
-        position.col * tileSize + position.colOffset - tileSize / 2
-      }
-    ${
-      position.row * tileSize + position.rowOffset - tileSize / 2 - 1
-    }), scale(0.9, 0.9)`}
-    >
-      {state.hasTag("regular") && (
-        <NormalGhost
-          color={color}
-          position={position}
-          direction={direction}
-          tileSize={tileSize}
-          paused={state.hasTag("movementPaused")}
-        />
-      )}
-      {state.hasTag("frightStarted") && (
-        <FrightStartedGhost
-          color={color}
-          position={position}
-          direction={direction}
-          tileSize={tileSize}
-          paused={state.hasTag("movementPaused")}
-        />
-      )}
-      {state.hasTag("frightEnding") && (
-        <FrightEndingGhost
-          color={color}
-          position={position}
-          direction={direction}
-          tileSize={tileSize}
-          paused={state.hasTag("movementPaused")}
-        />
-      )}
-      {state.hasTag("hidden") && (
-        <HiddenGhost
-          color={color}
-          position={position}
-          direction={direction}
-          tileSize={tileSize}
-        />
-      )}
-      {state.hasTag("dead") && (
-        <DeadGhost
-          color={color}
-          position={position}
-          direction={direction}
-          tileSize={tileSize}
-        />
-      )}
-      {state.hasTag("returningHome") && (
-        <ReturningHomeGhost
-          color={color}
-          position={position}
-          direction={direction}
-          tileSize={tileSize}
-        />
-      )}
-    </g>
+    <>
+      <g
+        transform={`translate(${
+          position.col * tileSize + position.colOffset - 4.8
+        }
+    ${position.row * tileSize + position.rowOffset - 6})`}
+      >
+        {state.hasTag("regular") && (
+          <NormalGhost
+            color={color}
+            position={position}
+            direction={direction}
+            tileSize={tileSize}
+            paused={state.hasTag("movementPaused")}
+          />
+        )}
+        {state.hasTag("frightStarted") && (
+          <FrightStartedGhost
+            color={color}
+            position={position}
+            direction={direction}
+            tileSize={tileSize}
+            paused={state.hasTag("movementPaused")}
+          />
+        )}
+        {state.hasTag("frightEnding") && (
+          <FrightEndingGhost
+            color={color}
+            position={position}
+            direction={direction}
+            tileSize={tileSize}
+            paused={state.hasTag("movementPaused")}
+          />
+        )}
+        {state.hasTag("hidden") && (
+          <HiddenGhost
+            color={color}
+            position={position}
+            direction={direction}
+            tileSize={tileSize}
+          />
+        )}
+        {state.hasTag("dead") && (
+          <DeadGhost
+            color={color}
+            position={position}
+            direction={direction}
+            tileSize={tileSize}
+          />
+        )}
+        {state.hasTag("returningHome") && (
+          <ReturningHomeGhost
+            color={color}
+            position={position}
+            direction={direction}
+            tileSize={tileSize}
+          />
+        )}
+      </g>
+      <g
+        transform={`translate(${position.col * tileSize}
+    ${position.row * tileSize})`}
+      >
+        <rect width="8" height="8" stroke="white" strokeWidth="1" fill="none" />
+      </g>
+      <g
+        transform={`translate(${
+          position.col * tileSize + position.colOffset - 0.5
+        }
+    ${position.row * tileSize + position.rowOffset - 0.5})`}
+      >
+        <circle r="1" cx="0" cy="0" fill="yellow" />
+      </g>
+    </>
   );
 });
 

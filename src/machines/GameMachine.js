@@ -4,6 +4,15 @@ import GhostMachine from "./GhostMachine";
 import { maze1, getTileType, setTileType } from "../shared/maze";
 import IntervalMachine from "./IntervalMachine";
 import Fruit from "./FruitMachine";
+import {
+  BlinkyChaseTargeting,
+  BlinkyElroyScatterTargeting,
+  BlinkyScatterTargeting,
+} from "./BlinkyTargeting";
+import {
+  PinkyChaseTargeting,
+  PinkyScatterTargeting,
+} from "./PinkyScatterTargetingMachine";
 
 const { pure, choose } = actions;
 const GHOST_HOUSE_ROW = 17;
@@ -12,6 +21,10 @@ const GHOST_HOUSE_MIDDLE_COL = 13;
 const GHOST_HOUSE_RIGHT_COL = 14;
 const CENTER_COL_OFFSET = 3;
 const CENTER_ROW_OFFSET = 4;
+const MIN_COL_OFFSET = 0;
+const MAX_COL_OFFSET = 7;
+const MIN_ROW_OFFSET = 0;
+const MAX_ROW_OFFSET = 7;
 
 const FRUIT_DROP_ROW = 20;
 const FRUIT_DROP_COL = 13;
@@ -36,10 +49,10 @@ const createGameStateForCharacters = (ctx) => {
 
 const characterStartPositions = {
   pacman: {
-    row: 3,
-    col: 3,
-    rowOffset: CENTER_ROW_OFFSET,
-    colOffset: CENTER_COL_OFFSET,
+    row: 26,
+    col: 13,
+    rowOffset: 4,
+    colOffset: 7,
   },
   inky: {
     row: GHOST_HOUSE_ROW,
@@ -51,7 +64,7 @@ const characterStartPositions = {
     row: GHOST_HOUSE_ROW,
     col: GHOST_HOUSE_MIDDLE_COL,
     rowOffset: CENTER_ROW_OFFSET,
-    colOffset: CENTER_COL_OFFSET,
+    colOffset: MAX_COL_OFFSET,
   },
   clyde: {
     row: GHOST_HOUSE_ROW,
@@ -65,6 +78,17 @@ const characterStartPositions = {
     rowOffset: CENTER_ROW_OFFSET,
     colOffset: CENTER_COL_OFFSET,
   },
+};
+
+const leftExitTile = { row: 14, col: 12 };
+const rightExitTile = leftExitTile;
+
+const characterStartDirections = {
+  pacman: "left",
+  inky: "up",
+  pinky: "down",
+  clyde: "up",
+  blinky: "left",
 };
 
 const getPoints = (event) => {
@@ -82,9 +106,9 @@ const getPoints = (event) => {
 
 const NUMBER_OF_LIVES = 3;
 
-const parent = createMachine(
+const GameMachine = createMachine(
   {
-    id: "parent",
+    id: "gameMachine",
     context: {
       pacman: {
         ref: undefined,
@@ -98,6 +122,8 @@ const parent = createMachine(
         frightenedModeEndingDuration: 5,
         pelletsFirstFruit: 12,
         pelletsSecondFruit: 50,
+        pelletsRemainingElroy: 230,
+        pelletsRemainingElroySpeedup: 10,
       },
       pelletCounters: {
         personal: {
@@ -128,42 +154,38 @@ const parent = createMachine(
                     rowOffset: 4,
                     colOffset: 7,
                   },
-                  direction: "left",
+                  direction: characterStartDirections.pacman,
                 }),
                 "pacman"
               ),
             }),
             ghosts: (ctx) => ({
-              inky: {
-                ref: spawn(
-                  GhostMachine.withContext({
-                    ...GhostMachine.context,
-                    maze: ctx.maze,
-                    character: "inky",
-                    position: characterStartPositions.inky,
-                    ghostConfig: {
-                      scatterTargetTile: {
-                        row: 15,
-                        col: 15,
-                      },
-                      targetTile: {
-                        row: 1,
-                        col: 1,
-                      },
-                      homeTile: characterStartPositions.inky,
-                      leftExitTile: {
-                        row: GHOST_HOUSE_ROW - 3,
-                        col: GHOST_HOUSE_MIDDLE_COL - 1,
-                      },
-                      rightExitTile: {
-                        row: GHOST_HOUSE_ROW - 3,
-                        col: GHOST_HOUSE_MIDDLE_COL + 1,
-                      },
-                    },
-                  }),
-                  "inky"
-                ),
-              },
+              // inky: {
+              //   ref: spawn(
+              //     GhostMachine.withContext({
+              //       ...GhostMachine.context,
+              //       maze: ctx.maze,
+              //       character: "inky",
+              //       position: characterStartPositions.inky,
+              //       direction: characterStartDirections.inky,
+              //       ghostConfig: {
+              //         scatterTargeting: BlinkyScatterTargeting,
+              //         chaseTargeting: BlinkyChaseTargeting,
+              //         homeTile: characterStartPositions.inky,
+              //         targetTile: { row: 1, col: 1 },
+              //         leftExitTile: {
+              //           row: GHOST_HOUSE_ROW - 3,
+              //           col: GHOST_HOUSE_MIDDLE_COL - 1,
+              //         },
+              //         rightExitTile: {
+              //           row: GHOST_HOUSE_ROW - 3,
+              //           col: GHOST_HOUSE_MIDDLE_COL + 1,
+              //         },
+              //       },
+              //     }),
+              //     "inky"
+              //   ),
+              // },
               pinky: {
                 ref: spawn(
                   GhostMachine.withContext({
@@ -171,59 +193,46 @@ const parent = createMachine(
                     maze: ctx.maze,
                     character: "pinky",
                     position: characterStartPositions.pinky,
+                    direction: characterStartDirections.pinky,
                     ghostConfig: {
-                      scatterTargetTile: {
-                        row: 3,
-                        col: 3,
-                      },
-                      targetTile: {
-                        row: 12,
-                        col: 12,
-                      },
+                      scatterTargeting: PinkyScatterTargeting,
+                      chaseTargeting: PinkyChaseTargeting,
                       homeTile: characterStartPositions.pinky,
-                      leftExitTile: {
-                        row: GHOST_HOUSE_ROW - 3,
-                        col: GHOST_HOUSE_MIDDLE_COL - 1,
-                      },
-                      rightExitTile: {
-                        row: GHOST_HOUSE_ROW - 3,
-                        col: GHOST_HOUSE_MIDDLE_COL + 1,
-                      },
+                      targetTile: { row: 1, col: 1 },
+                      leftExitTile,
+                      rightExitTile,
                     },
                   }),
                   "pinky"
                 ),
               },
-              clyde: {
-                ref: spawn(
-                  GhostMachine.withContext({
-                    ...GhostMachine.context,
-                    maze: ctx.maze,
-                    character: "clyde",
-                    position: characterStartPositions.clyde,
-                    ghostConfig: {
-                      scatterTargetTile: {
-                        row: 12,
-                        col: 3,
-                      },
-                      targetTile: {
-                        row: 12,
-                        col: 3,
-                      },
-                      homeTile: characterStartPositions.clyde,
-                      leftExitTile: {
-                        row: GHOST_HOUSE_ROW - 3,
-                        col: GHOST_HOUSE_MIDDLE_COL - 1,
-                      },
-                      rightExitTile: {
-                        row: GHOST_HOUSE_ROW - 3,
-                        col: GHOST_HOUSE_MIDDLE_COL + 1,
-                      },
-                    },
-                  }),
-                  "clyde"
-                ),
-              },
+              // clyde: {
+              //   ref: spawn(
+              //     GhostMachine.withContext({
+              //       ...GhostMachine.context,
+              //       maze: ctx.maze,
+              //       character: "clyde",
+              //       position: characterStartPositions.clyde,
+              //       direction: characterStartDirections.clyde,
+              //       ghostConfig: {
+              //         scatterTargeting: BlinkyScatterTargeting,
+              //         chaseTargeting: BlinkyChaseTargeting,
+              //         homeTile: characterStartPositions.clyde,
+              //         targetTile: { row: 1, col: 1 },
+
+              //         leftExitTile: {
+              //           row: GHOST_HOUSE_ROW - 3,
+              //           col: GHOST_HOUSE_MIDDLE_COL - 1,
+              //         },
+              //         rightExitTile: {
+              //           row: GHOST_HOUSE_ROW - 3,
+              //           col: GHOST_HOUSE_MIDDLE_COL + 1,
+              //         },
+              //       },
+              //     }),
+              //     "clyde"
+              //   ),
+              // },
               blinky: {
                 ref: spawn(
                   GhostMachine.withContext({
@@ -231,15 +240,19 @@ const parent = createMachine(
                     maze: ctx.maze,
                     character: "blinky",
                     position: characterStartPositions.blinky,
-                    direction: "left",
+                    direction: characterStartDirections.blinky,
                     ghostConfig: {
-                      scatterTargetTile: {
-                        row: 3,
-                        col: 12,
+                      scatterTargeting: BlinkyScatterTargeting,
+                      chaseTargeting: BlinkyChaseTargeting,
+                      targetTile: { row: 1, col: 1 },
+
+                      leftExitTile: {
+                        row: GHOST_HOUSE_ROW - 3,
+                        col: GHOST_HOUSE_MIDDLE_COL - 1,
                       },
-                      targetTile: {
-                        row: 12,
-                        col: 3,
+                      rightExitTile: {
+                        row: GHOST_HOUSE_ROW - 3,
+                        col: GHOST_HOUSE_MIDDLE_COL + 1,
                       },
                       homeTile: characterStartPositions.blinky,
                     },
@@ -261,6 +274,7 @@ const parent = createMachine(
       },
       inGame: {
         initial: "getReady",
+        type: "compound",
         states: {
           getReady: {
             tags: ["getReady"],
@@ -295,8 +309,36 @@ const parent = createMachine(
               LEVEL_COMPLETE: {
                 target: "levelComplete",
               },
+              LOSE_LIFE: {
+                target: "lostLife",
+              },
             },
             states: {
+              pelletWatcher: {
+                on: {
+                  PELLET_EATEN: [
+                    {
+                      cond: "releaseElroy",
+                      actions: [
+                        send(
+                          {
+                            type: "UPDATE_NORMAL_SPEED",
+                            speedPercentage: 1.95,
+                          },
+                          { to: "blinky" }
+                        ),
+                        send(
+                          {
+                            type: "UPDATE_SCATTER_TARGETING",
+                            targetingModule: BlinkyElroyScatterTargeting,
+                          },
+                          { to: "blinky" }
+                        ),
+                      ],
+                    },
+                  ],
+                },
+              },
               ghostExit: {
                 type: "parallel",
                 states: {
@@ -343,33 +385,28 @@ const parent = createMachine(
                         },
                       },
                       inkyActive: {
-                        entry: [() => console.log("INKY ACTIVE")],
                         on: {
-                          UPDATE_PERSONAL_COUNTER: [
-                            {
-                              cond: "inkyLeavePersonal",
-                              target: "clydeActive",
-                              actions: [
-                                {
-                                  type: "incrementPersonalCounter",
-                                  ghost: "inky",
-                                },
-                                "inkyLeaveHome",
-                                (ctx) =>
-                                  console.log("INKY DOTS", ctx.pelletCounters),
-                              ],
-                            },
-                            {
-                              actions: [
-                                {
-                                  type: "incrementPersonalCounter",
-                                  ghost: "inky",
-                                },
-                                (ctx) =>
-                                  console.log("INKY DOTS", ctx.pelletCounters),
-                              ],
-                            },
-                          ],
+                          // UPDATE_PERSONAL_COUNTER: [
+                          //   {
+                          //     cond: "inkyLeavePersonal",
+                          //     target: "clydeActive",
+                          //     actions: [
+                          //       {
+                          //         type: "incrementPersonalCounter",
+                          //         ghost: "inky",
+                          //       },
+                          //       "inkyLeaveHome",
+                          //     ],
+                          //   },
+                          //   {
+                          //     actions: [
+                          //       {
+                          //         type: "incrementPersonalCounter",
+                          //         ghost: "inky",
+                          //       },
+                          //     ],
+                          //   },
+                          // ],
                           GLOBAL_COUNTER_INCREMENTED: [
                             {
                               cond: "inkyLeaveGlobal",
@@ -380,10 +417,10 @@ const parent = createMachine(
                               actions: [send("RESET_GLOBAL_COUNTER")],
                             },
                           ],
-                          NEXT_GHOST_LEAVE_HOME: {
-                            target: "clydeActive",
-                            actions: ["inkyLeaveHome"],
-                          },
+                          // NEXT_GHOST_LEAVE_HOME: {
+                          //   target: "clydeActive",
+                          //   actions: ["inkyLeaveHome"],
+                          // },
                         },
                       },
                       clydeActive: {
@@ -560,7 +597,6 @@ const parent = createMachine(
                   },
                 },
               },
-
               loop: {
                 initial: "waiting",
                 states: {
@@ -649,7 +685,7 @@ const parent = createMachine(
                           "incrementPelletsEaten",
                           "notifyPacmanPellet",
                           { type: "awardPoints", points: getPoints("pellet") },
-                          send("PELLET_EATEN"),
+                          (ctx) => send("PELLET_EATEN"),
                         ],
                       },
                       {
@@ -711,7 +747,7 @@ const parent = createMachine(
                     intervals: [
                       { eventType: "CHASE", seconds: 2 },
                       { eventType: "SCATTER", seconds: 5 },
-                      { eventType: "CHASE", seconds: 5 },
+                      // { eventType: "CHASE", seconds: 5 },
                     ],
                   }),
                 },
@@ -728,8 +764,7 @@ const parent = createMachine(
                         ],
                       },
                       GHOST_COLLISION: {
-                        target: "#lostLife",
-                        actions: ["pauseCharacters"],
+                        actions: [send("LOSE_LIFE"), "pauseCharacters"],
                       },
                     },
                     states: {
@@ -842,12 +877,12 @@ const parent = createMachine(
                 after: {
                   3000: {
                     target: "finishedDying",
-                    actions: ["resetCharacterPositions"],
+                    actions: ["resetCharacterPositions", "removeFruit"],
                   },
                 },
               },
               finishedDying: {
-                type: "fina",
+                type: "final",
               },
             },
             onDone: {
@@ -914,7 +949,7 @@ const parent = createMachine(
       }),
       removeFruit: assign({
         fruit: (ctx) => {
-          ctx.fruit.ref.stop();
+          ctx.fruit?.ref?.stop();
           return undefined;
         },
       }),
@@ -1152,6 +1187,7 @@ const parent = createMachine(
             {
               type: "RESET_POSITION",
               position: characterStartPositions[character],
+              direction: characterStartDirections[character],
             },
             { to: character }
           )
@@ -1185,7 +1221,14 @@ const parent = createMachine(
         const tileType = getTileType(maze.tiles, position);
         return tileType === "powerPellet";
       },
-      eatenAllPellets: (ctx) => ctx.pelletsRemaining === 0,
+      releaseElroy: (ctx) =>
+        ctx.maze.pelletsRemaining - ctx.pelletsEaten ===
+        ctx.gameConfig.pelletsRemainingElroy,
+      elroySecondSpeedup: (ctx) =>
+        ctx.maze.pelletsRemaining - ctx.pelletsEaten ===
+        ctx.gameConfig.pelletsRemainingElroySpeedup,
+      eatenAllPellets: (ctx) =>
+        ctx.maze.pelletsRemaining - ctx.pelletsEaten === 0,
       shouldDropFirstFruit: (ctx) => {
         return ctx.pelletsEaten === ctx.gameConfig.pelletsFirstFruit - 1;
       },
@@ -1198,4 +1241,4 @@ const parent = createMachine(
   }
 );
 
-export default parent;
+export default GameMachine;

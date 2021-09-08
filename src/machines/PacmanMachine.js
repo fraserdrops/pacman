@@ -18,6 +18,11 @@ const every = (...guards) => ({
   guards,
 });
 
+const not = (guard) => ({
+  type: "not",
+  guard,
+});
+
 let directions = ["up", "down", "left", "right"];
 
 const MIN_COL_OFFSET = 0;
@@ -165,6 +170,7 @@ const PacmanSpeedMachine = createMachine(
       src: CharacterSpeedMachine,
       id: "speed",
       data: {
+        ...CharacterSpeedMachine.context,
         currentBaseInterval: (ctx, event) => ctx.currentBaseInterval,
         callbackEventName: "TICK",
       },
@@ -252,6 +258,12 @@ const MovementMachine = createMachine(
       SKIP_FRAMES: {
         actions: [forwardTo("speed")],
       },
+      PAUSE: {
+        actions: [forwardTo("speed")],
+      },
+      RESUME: {
+        actions: [forwardTo("speed")],
+      },
     },
     invoke: {
       src: PacmanSpeedMachine,
@@ -265,7 +277,6 @@ const MovementMachine = createMachine(
     initial: "normalMovement",
     states: {
       normalMovement: {
-        entry: (ctx, event) => console.log("normal movement", ctx),
         id: "normalMovement",
         initial: "ready",
         states: {
@@ -273,11 +284,7 @@ const MovementMachine = createMachine(
             on: {
               TICK: {
                 target: "checkMovementType",
-                actions: [
-                  "updatePosition",
-                  "respondWithUpdatedPosition",
-                  (ctx) => console.log("UPUOUO", ctx),
-                ],
+                actions: ["updatePosition", "respondWithUpdatedPosition"],
               },
             },
           },
@@ -364,7 +371,7 @@ const MovementMachine = createMachine(
       },
       walled: {
         initial: "ready",
-        entry: [send("WALLED")],
+        entry: [sendParent("WALLED")],
         states: {
           ready: {
             on: {
@@ -395,7 +402,7 @@ const MovementMachine = createMachine(
             ],
           },
         },
-        exit: [send("UNWALLED")],
+        exit: [sendParent("UNWALLED")],
       },
     },
   },
@@ -618,17 +625,13 @@ const PacmanMachine = createMachine(
         },
         states: {
           ready: {
-            entry: [() => console.log("ready")],
-
             on: {
               START: {
                 target: "playing",
-                actions: [() => console.log("START")],
               },
             },
           },
           playing: {
-            entry: [() => console.log("PLAYING")],
             invoke: {
               src: MovementMachine,
               id: "movement",
@@ -640,6 +643,7 @@ const PacmanMachine = createMachine(
                 nextDirection: (ctx, event) => ctx.nextDirection,
               },
             },
+            entry: ["resumeMovement", send("RESUME")],
             on: {
               LEFT: {
                 actions: ["requestDirectionLeft"],
@@ -662,33 +666,26 @@ const PacmanMachine = createMachine(
               UPDATE_POSITION: {
                 actions: ["updatePacmanPosition"],
               },
-            },
-          },
-          paused: {
-            on: {
+              PAUSE: {
+                actions: [send("PAUSE", { to: "movement" })],
+              },
               LOSE_LIFE: {
-                target: "dying",
+                target: "dead",
               },
               RESUME: {
-                target: "playing",
+                actions: [send("RESUME", { to: "movement" })],
               },
             },
           },
-          dying: {
-            after: {
-              3000: {
-                target: "waitingToRestart",
-              },
-            },
-          },
-          waitingToRestart: {
+          dead: {
             on: {
               RESET_POSITION: {
                 target: "ready",
-                actions: ["clearFramesToSkip", "setPosition"],
+                actions: ["setPosition", "setDirection"],
               },
             },
           },
+          waitingToRestart: {},
         },
       },
       view: {
@@ -705,10 +702,10 @@ const PacmanMachine = createMachine(
           stationary: {
             tags: ["stationary"],
             on: {
-              START: {
+              UNWALLED: {
                 target: "moving",
               },
-              UNWALLED: {
+              RESUME: {
                 target: "moving",
               },
             },
@@ -719,6 +716,9 @@ const PacmanMachine = createMachine(
               WALLED: {
                 target: "stationary",
               },
+              PAUSE: {
+                target: "stationary",
+              },
             },
           },
           hidden: {
@@ -726,6 +726,11 @@ const PacmanMachine = createMachine(
           },
           dying: {
             tags: ["dying"],
+            on: {
+              RESET_POSITION: {
+                target: "stationary",
+              },
+            },
           },
         },
       },
@@ -756,6 +761,7 @@ const PacmanMachine = createMachine(
           position: event.position,
         };
       }),
+      resumeMovement: send("RESUME", { to: "movement" }),
       requestDirectionLeft: send(
         { type: "REQUEST_CHANGE_DIRECTION", direction: "left" },
         { to: "movement" }
@@ -785,6 +791,9 @@ const PacmanMachine = createMachine(
           return getNextPosition(ctx.position, ctx.direction, ctx.maze, false);
         },
       }),
+      setDirection: assign({
+        direction: (ctx, event) => event.direction,
+      }),
       respondWithUpdatedPosition: sendParent((ctx) => {
         return {
           type: "UPDATE_POSITION",
@@ -812,6 +821,12 @@ const PacmanMachine = createMachine(
         return (ctx, event, { cond }) => {
           const { guards } = cond;
           return guards.every((guardKey) => this[guardKey](ctx, event));
+        };
+      },
+      get not() {
+        return (ctx, event, { cond }) => {
+          const { guard } = cond;
+          return !this[guard](ctx, event);
         };
       },
     },

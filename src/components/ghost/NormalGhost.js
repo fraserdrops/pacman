@@ -5,9 +5,9 @@ import { getEyePositionFromDirection } from "./util";
 const NormalGhost = React.memo((props) => {
   const { direction, color, paused } = props;
   let ghostColor = color;
-
   const { leftEye, rightEye, pupilOffset } =
     getEyePositionFromDirection(direction);
+
   return (
     <g>
       <g>

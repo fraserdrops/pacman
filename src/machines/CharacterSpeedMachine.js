@@ -2,7 +2,7 @@ import { actions, assign, createMachine, send, sendParent } from "xstate";
 
 const TickerMachine = createMachine({
   id: "ticker",
-  initial: "ticking",
+  initial: "paused",
   context: {
     intervalMS: undefined,
     callbackEventName: "TICK",
@@ -37,6 +37,9 @@ const TickerMachine = createMachine({
       on: {
         RESUME: {
           target: "ticking",
+        },
+        CHANGE_SPEED: {
+          actions: [assign({ intervalMS: (ctx, event) => event.intervalMS })],
         },
       },
     },
@@ -168,7 +171,7 @@ const CharacterSpeedMachine = createMachine(
       ),
       resumeTicker: send(
         {
-          type: "PAUSE",
+          type: "RESUME",
         },
         { to: "speedTicker" }
       ),
