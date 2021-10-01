@@ -10,6 +10,7 @@ import {
 import { getTileType } from "../shared/maze";
 import { Howl, Howler } from "howler";
 import CharacterSpeedMachine from "./CharacterSpeedMachine";
+import { getProjectedPosition } from "../util/characterUtil";
 
 const { raise, respond, choose } = actions;
 
@@ -33,64 +34,8 @@ const MAX_ROW_OFFSET = 7;
 const CENTER_COL_OFFSET = 3;
 const CENTER_ROW_OFFSET = 4;
 
-const getProjectedPosition = (currentPosition, direction, ignoreOffsets) => {
-  const { row, col, rowOffset, colOffset } = currentPosition;
-  let nextRow = row;
-  let nextCol = col;
-  let nextRowOffset = rowOffset;
-  let nextColOffset = colOffset;
-  switch (direction) {
-    case "up": {
-      if (rowOffset === MIN_ROW_OFFSET || ignoreOffsets) {
-        nextRow = row - 1;
-        nextRowOffset = MAX_ROW_OFFSET;
-      } else {
-        nextRowOffset = rowOffset - 1;
-      }
-      break;
-    }
-    case "down": {
-      if (rowOffset === MAX_ROW_OFFSET || ignoreOffsets) {
-        nextRow = row + 1;
-        nextRowOffset = 0;
-      } else {
-        nextRowOffset = rowOffset + 1;
-      }
-
-      break;
-    }
-    case "left": {
-      if (colOffset === MIN_COL_OFFSET || ignoreOffsets) {
-        nextCol = col - 1;
-        nextColOffset = MAX_COL_OFFSET;
-      } else {
-        nextColOffset = colOffset - 1;
-      }
-      break;
-    }
-    case "right": {
-      if (colOffset === MAX_COL_OFFSET || ignoreOffsets) {
-        nextCol = col + 1;
-        nextColOffset = MIN_COL_OFFSET;
-      } else {
-        nextColOffset = colOffset + 1;
-      }
-      break;
-    }
-    default: {
-    }
-  }
-
-  return {
-    row: nextRow,
-    col: nextCol,
-    rowOffset: nextRowOffset,
-    colOffset: nextColOffset,
-  };
-};
-
 const getNextPosition = (current, direction, maze) => {
-  let projectedPosition = getProjectedPosition(current, direction);
+  let projectedPosition = getProjectedPosition(maze, current, direction);
   return projectedPosition;
 };
 
@@ -357,7 +302,7 @@ const MovementMachine = createMachine(
               },
               {
                 target: "#normalMovement",
-                actions: ["turn"],
+                actions: ["completeCorneringTurn"],
               },
             ],
           },
@@ -453,7 +398,12 @@ const MovementMachine = createMachine(
       },
       pacmanWillHitWall: (ctx) => {
         const { position, direction, maze } = ctx;
-        let projectedPosition = getProjectedPosition(position, direction, true);
+        let projectedPosition = getProjectedPosition(
+          maze,
+          position,
+          direction,
+          true
+        );
         return getTileType(maze.tiles, projectedPosition) === "wall";
       },
       pacmanTilePositionAllowsCornering: (ctx) => {
@@ -479,6 +429,7 @@ const MovementMachine = createMachine(
       pacmanTurningWouldNotCollideWithWall: (ctx) => {
         const { position, requestedDirection, maze } = ctx;
         const nextPosition = getProjectedPosition(
+          maze,
           position,
           requestedDirection,
           true
@@ -535,13 +486,22 @@ const MovementMachine = createMachine(
         nextDirection: (ctx, event) => event.nextDirection,
       }),
       setNextPosition: assign({
-        position: (ctx) => getProjectedPosition(ctx.position, ctx.direction),
+        position: (ctx) =>
+          getProjectedPosition(ctx.maze, ctx.position, ctx.direction),
       }),
       turn: assign((ctx) => {
         return {
           ...ctx,
           direction: ctx.requestedDirection,
           requestedDirection: undefined,
+        };
+      }),
+      // we can't just use the 'turn' action, because request direction could change while we are cornering. So we need to use
+      // the direction that was requested at the start of cornering, saved as next in corneringDirections
+      completeCorneringTurn: assign((ctx) => {
+        return {
+          ...ctx,
+          direction: ctx.corneringDirections.next,
         };
       }),
       reverse: assign((ctx) => {

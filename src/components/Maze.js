@@ -33,6 +33,12 @@ const Maze = React.memo((props) => {
     <g>
       <rect width={28 * tileSize} height={36 * tileSize} fill="black" />
       {tiles}
+      <g
+        transform={`translate(${11 * tileSize}
+    ${14 * tileSize})`}
+      >
+        <rect width="8" height="8" stroke="green" strokeWidth="1" fill="none" />
+      </g>
     </g>
   );
 });

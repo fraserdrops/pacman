@@ -40,18 +40,9 @@ const GhostMovementMachine = createMachine(
       gameConfig: {},
     },
     on: {
-      ENTER_RED_ZONE: {
-        actions: ["applyRedZoneRestrictions"],
-      },
-      EXIT_RED_ZONE: {
-        actions: ["removeRedZoneRestrictions"],
-      },
       UPDATE_NEXT_DIRECTION: {
         actions: ["updateNextDirection"],
       },
-      // PAUSE: {
-      //   target: ".paused",
-      // },
       CHANGE_TARGET_TILE: {
         actions: ["setTargetTile"],
       },
@@ -88,9 +79,6 @@ const GhostMovementMachine = createMachine(
       APPLY_DIRECTION_RESTRICTIONS: {
         actions: [forwardTo("direction")],
       },
-      SEEK_TARGET_TILE: {
-        target: ".seekTargetTile",
-      },
     },
     invoke: [
       {
@@ -106,134 +94,197 @@ const GhostMovementMachine = createMachine(
       },
       { src: DirectionMachine, id: "direction" },
     ],
-    initial: "tileStrobe",
+    type: "parallel",
     states: {
-      tileStrobe: {
-        initial: "paused",
+      movementState: {
+        initial: "stopped",
         states: {
-          paused: {
+          moving: {
+            initial: "pattern",
+            states: {
+              pattern: {
+                on: {
+                  TICK: {
+                    actions: [send("MOVE")],
+                  },
+                  START_REVERSING_SEQUENCE: {
+                    target: "reversing",
+                  },
+                },
+              },
+              reversing: {
+                initial: "idle",
+                on: {
+                  REVERSE_COMPLETE: {
+                    target: "pattern",
+                  },
+                },
+                states: {
+                  idle: {
+                    on: {
+                      TICK: {
+                        target: "updateDirection",
+                        actions: ["setNextPosition", "forwardNextPosition"],
+                      },
+                    },
+                  },
+                  updateDirection: {
+                    always: {
+                      target: "idle",
+                      actions: [
+                        choose([
+                          {
+                            cond: every(
+                              // "turningWouldNotCollideWithWall",
+                              "atStartOfTile"
+                            ),
+                            // when the ghost reaches the center of a tile, it switches to using the next direction it calculated a tile ago,
+                            // then looks ahead to choose a direction for when it reachs the next tile
+                            actions: [
+                              "reverseDirection",
+                              "sendReversingFinished",
+                            ],
+                          },
+                        ]),
+                        "sendMovementFinished",
+                      ],
+                    },
+                  },
+                },
+              },
+            },
+            on: {
+              PAUSE: {
+                target: "stopped",
+                actions: ["pauseSpeed"],
+              },
+            },
+          },
+          stopped: {
             on: {
               RESUME: {
-                target: "idle",
-                actions: ["resumeSpeed"],
-              },
-            },
-          },
-          idle: {
-            on: {
-              TICK: {
-                target: "updateDirection",
-                actions: [
-                  "setNextPosition",
-                  "forwardNextPosition",
-                  // (ctx, event) =>
-                  //   console.log(
-                  //     "direction has been chosen, current: " +
-                  //       ctx.direction +
-                  //       "next: " +
-                  //       ctx.nextDirection
-                  //   ),
-                ],
-              },
-            },
-          },
-          updateDirection: {
-            always: {
-              target: "idle",
-              actions: [
-                choose([
-                  {
-                    cond: every(
-                      // "turningWouldNotCollideWithWall",
-                      "atEdgeOfTile"
-                    ),
-                    // when the ghost reaches the center of a tile, it switches to using the next direction it calculated a tile ago,
-                    // then looks ahead to choose a direction for when it reachs the next tile
-                    actions: ["reverseDirection"],
-                  },
-                ]),
-                "sendMovementFinished",
-              ],
-            },
-          },
-        },
-      },
-      seekTargetTile: {
-        initial: "idle",
-        states: {
-          // init: {
-          //   entry: [
-          //     (ctx) =>
-          //       console.log(
-          //         "INITdirection has been chosen, current: " +
-          //           ctx.direction +
-          //           "next: " +
-          //           ctx.nextDirection
-          //       ),
-          //   ],
-          //   initial: "requestDirection",
-          //   states: {
-          //     requestDirection: {
-          //       always: {
-          //         target: "waitingForDirection",
-          //         actions: ["chooseNextDirection"],
-          //       },
-          //     },
-          //     waitingForDirection: {
-          //       on: {
-          //         UPDATE_NEXT_DIRECTION: {
-          //           target: "recievedDirection",
-          //           actions: ["updateNextDirection"],
-          //         },
-          //       },
-          //     },
-          //     recievedDirection: {
-          //       type: "final",
-          //     },
-          //   },
-          //   onDone: {
-          //     target: "paused",
-          //   },
-          // },
-          idle: {
-            on: {
-              TICK: {
-                target: "updateDirection",
-                actions: ["setNextPosition", "forwardNextPosition"],
-              },
-            },
-          },
-          updateDirection: {
-            always: {
-              target: "idle",
-              actions: [
-                choose([
-                  {
-                    cond: every(
-                      // "turningWouldNotCollideWithWall",
-                      "inCenterOfTile"
-                    ),
-                    // when the ghost reaches the center of a tile, it switches to using the next direction it calculated a tile ago,
-                    // then looks ahead to choose a direction for when it reachs the next tile
-                    actions: ["switchToNextDirection", "chooseNextDirection"],
-                  },
-                ]),
-                "sendMovementFinished",
-              ],
-            },
-          },
-          paused: {
-            tags: ["movementPaused"],
-            on: {
-              RESUME: {
-                target: "idle",
+                target: "moving",
                 actions: ["resumeSpeed"],
               },
             },
           },
         },
       },
-      random: {},
+      directionPattern: {
+        initial: "tileStrobe",
+        on: {
+          SEEK_TARGET_TILE: {
+            target: ".seekTargetTile",
+          },
+          RANDOM_MOVEMENT: {
+            target: ".random",
+          },
+        },
+        states: {
+          tileStrobe: {
+            initial: "idle",
+            states: {
+              idle: {
+                on: {
+                  MOVE: {
+                    target: "updateDirection",
+                    actions: ["setNextPosition", "forwardNextPosition"],
+                  },
+                },
+              },
+              updateDirection: {
+                always: {
+                  target: "idle",
+                  actions: [
+                    choose([
+                      {
+                        cond: every(
+                          // "turningWouldNotCollideWithWall",
+                          "atEdgeOfTile"
+                        ),
+                        // when the ghost reaches the center of a tile, it switches to using the next direction it calculated a tile ago,
+                        // then looks ahead to choose a direction for when it reachs the next tile
+                        actions: ["reverseDirection"],
+                      },
+                    ]),
+                    "sendMovementFinished",
+                  ],
+                },
+              },
+            },
+          },
+          seekTargetTile: {
+            initial: "idle",
+            states: {
+              idle: {
+                on: {
+                  MOVE: {
+                    target: "updateDirection",
+                    actions: ["setNextPosition", "forwardNextPosition"],
+                  },
+                },
+              },
+              updateDirection: {
+                always: {
+                  target: "idle",
+                  actions: [
+                    choose([
+                      {
+                        cond: every(
+                          // "turningWouldNotCollideWithWall",
+                          "inCenterOfTile"
+                        ),
+                        // when the ghost reaches the center of a tile, it switches to using the next direction it calculated a tile ago,
+                        // then looks ahead to choose a direction for when it reachs the next tile
+                        actions: [
+                          "switchToNextDirection",
+                          "chooseNextDirection",
+                        ],
+                      },
+                    ]),
+                    "sendMovementFinished",
+                  ],
+                },
+              },
+            },
+          },
+          random: {
+            initial: "idle",
+            states: {
+              idle: {
+                on: {
+                  MOVE: {
+                    target: "updateDirection",
+                    actions: ["setNextPosition", "forwardNextPosition"],
+                  },
+                },
+              },
+              updateDirection: {
+                always: {
+                  target: "idle",
+                  actions: [
+                    choose([
+                      {
+                        cond: every(
+                          // "turningWouldNotCollideWithWall",
+                          "inCenterOfTile"
+                        ),
+                        // when the ghost reaches the center of a tile, it switches to using the next direction it calculated a tile ago,
+                        // then looks ahead to choose a direction for when it reachs the next tile
+                        actions: [
+                          "switchToNextDirection",
+                          "chooseNextRandomDirection",
+                        ],
+                      },
+                    ]),
+                    "sendMovementFinished",
+                  ],
+                },
+              },
+            },
+          },
+        },
+      },
     },
   },
   {
@@ -274,6 +325,26 @@ const GhostMovementMachine = createMachine(
           return colOffset === CENTER_COL_OFFSET;
         }
       },
+      atStartOfTile: (ctx) => {
+        // pacman can turn if he is at the center of the current tile
+        const { direction, position } = ctx;
+        const { colOffset, rowOffset } = position;
+        if (direction === "up") {
+          return rowOffset === MAX_ROW_OFFSET;
+        }
+
+        if (direction === "down") {
+          return rowOffset === MIN_ROW_OFFSET;
+        }
+
+        if (direction === "left") {
+          return colOffset === MAX_COL_OFFSET;
+        }
+
+        if (direction === "right") {
+          return colOffset === MIN_COL_OFFSET;
+        }
+      },
     },
     actions: {
       sendMovementFinished: sendParent((ctx) => ({
@@ -282,14 +353,29 @@ const GhostMovementMachine = createMachine(
         position: ctx.position,
         direction: ctx.direction,
       })),
+      sendReversingFinished: send("REVERSE_COMPLETE"),
       reverseDirection: assign({
         direction: (ctx) => getReverseDirection(ctx.direction),
+        nextDirection: (ctx) => getReverseDirection(ctx.direction),
       }),
       chooseNextDirection: send(
         (ctx, event) => {
           const { maze, position, direction, targetTile } = ctx;
           return {
             type: "CALCULATE_NEXT_DIRECTION",
+            maze,
+            position,
+            direction,
+            targetTile,
+          };
+        },
+        { to: "direction" }
+      ),
+      chooseNextRandomDirection: send(
+        (ctx, event) => {
+          const { maze, position, direction, targetTile } = ctx;
+          return {
+            type: "CALCULATE_NEXT_RANDOM_DIRECTION",
             maze,
             position,
             direction,
@@ -312,12 +398,14 @@ const GhostMovementMachine = createMachine(
         nextDirection: (ctx, event) => event.nextDirection,
       }),
       setNextPosition: assign({
-        position: (ctx) => getProjectedPosition(ctx.position, ctx.direction),
+        position: (ctx) =>
+          getProjectedPosition(ctx.maze, ctx.position, ctx.direction),
       }),
       setTargetTile: assign({
         targetTile: (ctx, event) => event.targetTile,
       }),
       resumeSpeed: send("RESUME", { to: "speed" }),
+      pauseSpeed: send("PAUSE", { to: "speed" }),
     },
   }
 );

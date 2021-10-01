@@ -15,7 +15,8 @@ import {
 } from "./PinkyScatterTargetingMachine";
 
 const { pure, choose } = actions;
-const GHOST_HOUSE_ROW = 17;
+const GHOST_HOUSE_MIDDLE_ROW = 17;
+const GHOST_HOUSE_BOTTOM_ROW = 18;
 const GHOST_HOUSE_LEFT_COL = 12;
 const GHOST_HOUSE_MIDDLE_COL = 13;
 const GHOST_HOUSE_RIGHT_COL = 14;
@@ -55,33 +56,61 @@ const characterStartPositions = {
     colOffset: 7,
   },
   inky: {
-    row: GHOST_HOUSE_ROW,
+    row: GHOST_HOUSE_MIDDLE_ROW,
     col: GHOST_HOUSE_LEFT_COL,
     rowOffset: CENTER_ROW_OFFSET,
     colOffset: CENTER_COL_OFFSET,
   },
   pinky: {
-    row: GHOST_HOUSE_ROW,
+    row: GHOST_HOUSE_MIDDLE_ROW,
     col: GHOST_HOUSE_MIDDLE_COL,
     rowOffset: CENTER_ROW_OFFSET,
     colOffset: MAX_COL_OFFSET,
   },
   clyde: {
-    row: GHOST_HOUSE_ROW,
+    row: GHOST_HOUSE_MIDDLE_ROW,
     col: GHOST_HOUSE_RIGHT_COL,
     rowOffset: CENTER_ROW_OFFSET,
     colOffset: CENTER_COL_OFFSET,
   },
   blinky: {
-    row: GHOST_HOUSE_ROW - 3,
+    row: GHOST_HOUSE_MIDDLE_ROW - 3,
     col: GHOST_HOUSE_MIDDLE_COL,
     rowOffset: CENTER_ROW_OFFSET,
     colOffset: CENTER_COL_OFFSET,
   },
 };
 
+const ghostHomeReturnTiles = {
+  inky: {
+    row: GHOST_HOUSE_BOTTOM_ROW,
+    col: GHOST_HOUSE_LEFT_COL,
+  },
+  pinky: {
+    row: GHOST_HOUSE_BOTTOM_ROW,
+    col: GHOST_HOUSE_MIDDLE_COL,
+  },
+  blinky: {
+    row: GHOST_HOUSE_BOTTOM_ROW,
+    col: GHOST_HOUSE_MIDDLE_COL,
+  },
+  clyde: {
+    row: GHOST_HOUSE_BOTTOM_ROW,
+    col: GHOST_HOUSE_RIGHT_COL,
+  },
+};
+
 const leftExitTile = { row: 14, col: 12 };
-const rightExitTile = leftExitTile;
+const rightExitTile = { row: 14, col: 16 };
+
+const leftEntranceTile = {
+  col: GHOST_HOUSE_MIDDLE_COL,
+  row: GHOST_HOUSE_MIDDLE_ROW - 2,
+};
+const rightEntranceTile = {
+  col: GHOST_HOUSE_MIDDLE_COL + 1,
+  row: GHOST_HOUSE_MIDDLE_ROW - 2,
+};
 
 const characterStartDirections = {
   pacman: "left",
@@ -174,11 +203,11 @@ const GameMachine = createMachine(
               //         homeTile: characterStartPositions.inky,
               //         targetTile: { row: 1, col: 1 },
               //         leftExitTile: {
-              //           row: GHOST_HOUSE_ROW - 3,
+              //           row: GHOST_HOUSE_MIDDLE_ROW - 3,
               //           col: GHOST_HOUSE_MIDDLE_COL - 1,
               //         },
               //         rightExitTile: {
-              //           row: GHOST_HOUSE_ROW - 3,
+              //           row: GHOST_HOUSE_MIDDLE_ROW - 3,
               //           col: GHOST_HOUSE_MIDDLE_COL + 1,
               //         },
               //       },
@@ -197,10 +226,13 @@ const GameMachine = createMachine(
                     ghostConfig: {
                       scatterTargeting: PinkyScatterTargeting,
                       chaseTargeting: PinkyChaseTargeting,
-                      homeTile: characterStartPositions.pinky,
+                      startingTile: characterStartPositions.pinky,
+                      homeReturnTile: ghostHomeReturnTiles.pinky,
                       targetTile: { row: 1, col: 1 },
                       leftExitTile,
                       rightExitTile,
+                      leftEntranceTile,
+                      rightEntranceTile,
                     },
                   }),
                   "pinky"
@@ -221,11 +253,11 @@ const GameMachine = createMachine(
               //         targetTile: { row: 1, col: 1 },
 
               //         leftExitTile: {
-              //           row: GHOST_HOUSE_ROW - 3,
+              //           row: GHOST_HOUSE_MIDDLE_ROW - 3,
               //           col: GHOST_HOUSE_MIDDLE_COL - 1,
               //         },
               //         rightExitTile: {
-              //           row: GHOST_HOUSE_ROW - 3,
+              //           row: GHOST_HOUSE_MIDDLE_ROW - 3,
               //           col: GHOST_HOUSE_MIDDLE_COL + 1,
               //         },
               //       },
@@ -245,16 +277,18 @@ const GameMachine = createMachine(
                       scatterTargeting: BlinkyScatterTargeting,
                       chaseTargeting: BlinkyChaseTargeting,
                       targetTile: { row: 1, col: 1 },
-
                       leftExitTile: {
-                        row: GHOST_HOUSE_ROW - 3,
+                        row: GHOST_HOUSE_MIDDLE_ROW - 3,
                         col: GHOST_HOUSE_MIDDLE_COL - 1,
                       },
                       rightExitTile: {
-                        row: GHOST_HOUSE_ROW - 3,
+                        row: GHOST_HOUSE_MIDDLE_ROW - 3,
                         col: GHOST_HOUSE_MIDDLE_COL + 1,
                       },
-                      homeTile: characterStartPositions.blinky,
+                      startingTile: characterStartPositions.blinky,
+                      homeReturnTile: ghostHomeReturnTiles.blinky,
+                      leftEntranceTile,
+                      rightEntranceTile,
                     },
                   }),
                   "blinky"
@@ -746,7 +780,7 @@ const GameMachine = createMachine(
                     ...IntervalMachine.context,
                     intervals: [
                       { eventType: "CHASE", seconds: 2 },
-                      { eventType: "SCATTER", seconds: 5 },
+                      // { eventType: "SCATTER", seconds: 5 },
                       // { eventType: "CHASE", seconds: 5 },
                     ],
                   }),

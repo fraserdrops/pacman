@@ -44,6 +44,7 @@ const GhostMachine = createMachine(
         speed: {},
         directions: {},
       },
+      chaseModeHasChanged: false,
       maze: [],
       gameConfig: {
         baseSpeed: 35,
@@ -154,7 +155,10 @@ const GhostMachine = createMachine(
             actions: ["setPosition"],
           },
           PAUSE: {
-            actions: [send("PAUSE", { to: "movement" })],
+            actions: [
+              send("PAUSE", { to: "movement" }),
+              () => console.log("PAUSE PUASE"),
+            ],
           },
           RESUME: {
             actions: [send("RESUME", { to: "movement" })],
@@ -250,7 +254,10 @@ const GhostMachine = createMachine(
                         },
                       },
                       inside: {
-                        entry: ["sendOnTargetTile"],
+                        // entry: [
+                        //   "sendOnTargetTile",
+                        //   () => console.log("SEND ON"),
+                        // ],
                         exit: [""],
                         on: {
                           MOVEMENT_FINISHED: [
@@ -394,9 +401,11 @@ const GhostMachine = createMachine(
                 on: {
                   SCATTER: {
                     target: ".scatter",
+                    actions: ["chaseModeHasChanged"],
                   },
                   CHASE: {
                     target: ".chase",
+                    actions: ["chaseModeHasChanged"],
                   },
                   FRIGHTENED: {
                     target: ".frightened",
@@ -429,9 +438,9 @@ const GhostMachine = createMachine(
                         actions: ["switchToStrobeMovement"],
                       },
                       OUTSIDE_GHOST_HOUSE: {
-                        target: "leavingHome",
+                        target: "normal",
                         actions: [
-                          "setTargetTileExitLeft",
+                          // "setTargetTileExitLeft",
                           "seekTargetTile",
                           () => console.log("LEFT EXIT"),
                         ],
@@ -440,61 +449,75 @@ const GhostMachine = createMachine(
                     exit: [send("RESUME", { to: "movement" })],
                   },
                   atHome: {
-                    initial: "exitLeft",
                     entry: [
                       "setHomeTargetTile",
                       // "applyAtHomeMovementRestrictions",
                       "blockGhostHouseEntrance",
                     ],
+                    on: {
+                      LEAVE_HOME: {
+                        target: "leavingHome",
+                        actions: [
+                          "setTargetTileHouseEntrance",
+                          "seekTargetTile",
+                          "unblockGhostHouseEntrance",
+                        ],
+                      },
+                    },
                     // exit: ["removeAtHomeMovementRestrictions"],
+                  },
+                  leavingHome: {
+                    initial: "headingForHouseEntrance",
                     states: {
-                      exitLeft: {
-                        on: {
-                          SCATTER: {
-                            target: "exitRight",
-                          },
-                          CHASE: {
-                            target: "exitRight",
-                          },
-                          LEAVE_HOME: {
-                            target: "aboutToLeave",
-                            actions: [
-                              "setTargetTileExitLeft",
-                              "seekTargetTile",
-                              "unblockGhostHouseEntrance",
+                      headingForHouseEntrance: {
+                        entry: [
+                          choose(
+                            [
+                              {
+                                actions: ["setTargetTileHouseRightEntrance"],
+                                cond: "chaseModeHasChanged",
+                              },
                             ],
+                            {
+                              actions: ["setTargetTileHouseLeftEntrance"],
+                            }
+                          ),
+                        ],
+                        on: {
+                          ON_TARGET_TILE: {
+                            target: "exitingHouse",
                           },
                         },
                       },
-                      exitRight: {
-                        on: {
-                          LEAVE_HOME: {
-                            target: "aboutToLeave",
-                            actions: [
-                              "setTargetTileExitRight",
-                              "seekTargetTile",
-                              "unblockGhostHouseEntrance",
+                      exitingHouse: {
+                        entry: [
+                          () => console.log("EXITING HOUSE"),
+                          choose(
+                            [
+                              {
+                                actions: ["setTargetTileExitRight"],
+                                cond: "chaseModeHasChanged",
+                              },
                             ],
+                            {
+                              actions: ["setTargetTileExitLeft"],
+                            }
+                          ),
+                        ],
+                        on: {
+                          ON_TARGET_TILE: {
+                            target: "exitComplete",
+                            actions: ["blockGhostHouseEntrance"],
                           },
                         },
                       },
-                      aboutToLeave: {
+                      exitComplete: {
+                        entry: [() => console.log("EXITING COMOPLETE")],
                         type: "final",
                       },
                     },
                     onDone: {
-                      target: "leavingHome",
-                    },
-                  },
-                  leavingHome: {
-                    on: {
-                      ON_TARGET_TILE: {
-                        target: "normal",
-                        actions: [
-                          "blockGhostHouseEntrance",
-                          () => console.log("REACHED TARGET"),
-                        ],
-                      },
+                      target: "normal",
                     },
                   },
                   normal: {
@@ -545,6 +568,7 @@ const GhostMachine = createMachine(
                         on: {
                           SCATTER: {
                             target: "scatter",
+                            actions: ["startReversingSequence"],
                           },
                           FRIGHTENED: {
                             target: "frightened",
@@ -606,6 +630,7 @@ const GhostMachine = createMachine(
                         on: {
                           CHASE: {
                             target: "chase",
+                            actions: ["startReversingSequence"],
                           },
                           FRIGHTENED: {
                             target: "frightened",
@@ -664,13 +689,25 @@ const GhostMachine = createMachine(
                             }),
                             { to: "movement" }
                           ),
+                          send(
+                            (ctx) => ({
+                              type: "RANDOM_MOVEMENT",
+                              intervalMS:
+                                ctx.gameConfig.baseSpeed /
+                                ctx.gameConfig.speedPercentage.frightened,
+                            }),
+                            { to: "movement" }
+                          ),
+                          "startReversingSequence",
                         ],
                         on: {
                           SCATTER: {
                             target: "scatter",
+                            actions: ["seekTargetTile"],
                           },
                           CHASE: {
                             target: "chase",
+                            actions: ["seekTargetTile"],
                           },
                           FRIGHTENED: {
                             target: "frightened",
@@ -685,8 +722,10 @@ const GhostMachine = createMachine(
                       RESUME: {
                         target: "returningHome",
                         actions: [
-                          "setHomeTargetTile",
+                          "setHomeReturnTargetTile",
+                          "seekTargetTile",
                           send("RESUME", { to: "movement" }),
+                          "unblockGhostHouseEntrance",
                           send(
                             (ctx) => ({
                               type: "CHANGE_SPEED",
@@ -718,6 +757,14 @@ const GhostMachine = createMachine(
                         {
                           // cond: "reachedHomeTile",
                           target: "leavingHome",
+                          actions: [
+                            send(
+                              (ctx) => ({
+                                type: "APPLY_DIRECTION_RESTRICTIONS",
+                              }),
+                              { to: "movement" }
+                            ),
+                          ],
                         },
                       ],
                     },
@@ -743,6 +790,7 @@ const GhostMachine = createMachine(
           nextDirection: ctx.nextDirection,
         };
       }),
+      chaseModeHasChanged: assign({ chaseModeHasChanged: () => true }),
       switchToStrobeMovement: send("", { to: "movement" }),
       seekTargetTile: send("SEEK_TARGET_TILE", { to: "movement" }),
       applyRedZoneRestrictions: pure((ctx) => {
@@ -757,6 +805,9 @@ const GhostMachine = createMachine(
             { to: "movement" }
           );
         });
+      }),
+      startReversingSequence: send("START_REVERSING_SEQUENCE", {
+        to: "movement",
       }),
       removeRedZoneRestrictions: pure((ctx) => {
         return ctx.maze.zones.redZones.map((zone, index) => {
@@ -838,10 +889,24 @@ const GhostMachine = createMachine(
         }),
         { to: "movement" }
       ),
-      setHomeTargetTile: send(
+      setTargetTileHouseLeftEntrance: send(
         (ctx) => ({
           type: "CHANGE_TARGET_TILE",
-          targetTile: ctx.ghostConfig.homeTile,
+          targetTile: ctx.ghostConfig.leftEntranceTile,
+        }),
+        { to: "movement" }
+      ),
+      setTargetTileHouseRightEntrance: send(
+        (ctx) => ({
+          type: "CHANGE_TARGET_TILE",
+          targetTile: ctx.ghostConfig.rightEntranceTile,
+        }),
+        { to: "movement" }
+      ),
+      setHomeReturnTargetTile: send(
+        (ctx) => ({
+          type: "CHANGE_TARGET_TILE",
+          targetTile: ctx.ghostConfig.homeReturnTile,
         }),
         { to: "movement" }
       ),
@@ -927,6 +992,7 @@ const GhostMachine = createMachine(
         const { ghostHouse } = maze.zones;
         return isPositionWithinZone(position, ghostHouse);
       },
+      chaseModeHasChanged: (ctx) => ctx.chaseModeHasChanged,
     },
   }
 );

@@ -31,6 +31,9 @@ const DirectionMachine = createMachine(
       CALCULATE_NEXT_DIRECTION: {
         actions: ["calculateNextDirection"],
       },
+      CALCULATE_NEXT_RANDOM_DIRECTION: {
+        actions: ["calculateNextRandomDirection"],
+      },
     },
   },
   {
@@ -45,6 +48,15 @@ const DirectionMachine = createMachine(
           targetTile,
           restrictedZones,
           forbiddenZones,
+        });
+        return { type: "UPDATE_NEXT_DIRECTION", nextDirection };
+      }),
+      calculateNextRandomDirection: sendParent((ctx, event) => {
+        const { maze, position, direction } = event;
+        const nextDirection = chooseNextRandomDirection({
+          maze,
+          position,
+          direction,
         });
         return { type: "UPDATE_NEXT_DIRECTION", nextDirection };
       }),
@@ -115,6 +127,7 @@ function chooseNextDirection({
 
   let nextDirection = "up";
   const nextPosition = getProjectedPosition(
+    maze,
     { direction, row: position.row, col: position.col },
     direction,
     true
@@ -134,6 +147,7 @@ function chooseNextDirection({
 
   validDirections = validDirections.filter((direction) => {
     const projectedPosition = getProjectedPosition(
+      maze,
       { row: nextPosition.row, col: nextPosition.col },
       direction,
       true
@@ -145,7 +159,12 @@ function chooseNextDirection({
     );
     return !isWall && !isRestrictedTile;
   });
-
+  // console.table({
+  //   targetTile,
+  //   forbiddenZones,
+  //   restrictedZones,
+  //   position,
+  // });
   // disallow reversing, unless reversing is the only option
   if (validDirections.length > 1) {
     validDirections = filterReverseDirection(direction, validDirections);
@@ -157,10 +176,12 @@ function chooseNextDirection({
     const distanceToTargetIfDirectionChosen = validDirections.map(
       (direction) => {
         const projectedPosition = getProjectedPosition(
+          maze,
           { row: nextPosition.row, col: nextPosition.col },
           direction,
           true
         );
+
         return euclideanDistance(
           projectedPosition.row,
           projectedPosition.col,
@@ -195,6 +216,37 @@ function chooseNextDirection({
     nextDirection = validDirections[0];
   }
   return nextDirection;
+}
+
+function chooseNextRandomDirection({ maze, position, direction }) {
+  // the ghosts look one tile ahead and choose what direction they will take when they get to the next tile
+
+  const nextPosition = getProjectedPosition(
+    maze,
+    { direction, row: position.row, col: position.col },
+    direction,
+    true
+  );
+
+  let validDirections = [...directions].filter((direction) => {
+    const projectedPosition = getProjectedPosition(
+      maze,
+      { row: nextPosition.row, col: nextPosition.col },
+      direction,
+      true
+    );
+    const isWall = getTileType(maze.tiles, projectedPosition) === "wall";
+    return !isWall;
+  });
+
+  // disallow reversing, unless reversing is the only option
+  if (validDirections.length > 1) {
+    validDirections = filterReverseDirection(direction, validDirections);
+  }
+
+  const randomDirection =
+    validDirections[Math.floor(Math.random() * validDirections.length)];
+  return randomDirection;
 }
 
 export default DirectionMachine;

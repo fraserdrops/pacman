@@ -1,50 +1,152 @@
-import { actions, createMachine, sendParent } from "xstate";
+import { actions, createMachine, sendParent, assign } from "xstate";
 import IntervalMachine from "./IntervalMachine";
 
-const Fruit = createMachine({
-  id: "fruit",
-  initial: "ripe",
+const Ticker = (context) => (cb) => {
+  const interval = setInterval(() => {
+    cb("TICK");
+  }, 1000 * context.interval);
+
+  return () => {
+    clearInterval(interval);
+  };
+};
+
+const Timer = createMachine({
+  initial: "running",
   context: {
-    value: 100,
+    elapsed: 0,
+    duration: 5,
+    interval: 1,
   },
   states: {
-    ripe: {
+    running: {
       invoke: {
-        src: IntervalMachine.withContext({
-          intervals: [
-            {
-              eventType: "GONE_ROTTEN",
-              seconds: 9 + Math.random(),
-            },
-          ],
-        }),
+        src: Ticker,
       },
       on: {
-        FRUIT_EATEN: {
-          target: "eaten",
+        PAUSE: {
+          target: "paused",
         },
-        GONE_ROTTEN: {
-          target: "removed",
-          actions: [sendParent("REMOVE_FRUIT")],
+        TICK: {
+          actions: ["incrementElapsedTime"],
         },
       },
     },
-    eaten: {
-      tags: ["eaten"],
-      invoke: {
-        src: IntervalMachine.withContext({
-          intervals: [{ eventType: "REMOVE_FRUIT", seconds: 3 }],
-        }),
-      },
+    paused: {
       on: {
-        REMOVE_FRUIT: {
-          target: "removed",
-          actions: [sendParent("REMOVE_FRUIT")],
+        RESUME: {
+          target: "running",
         },
       },
     },
-    removed: {},
   },
 });
 
-export default Fruit;
+const Ticker2 = createMachine({
+  initial: "ticking",
+  states: {
+    ticking: {
+      invoke: {
+        src: Ticker,
+      },
+      on: {
+        PAUSE: {
+          target: "paused",
+        },
+        TICK: {
+          actions: ["notifyParent"],
+        },
+      },
+    },
+    paused: {
+      on: {
+        RESUME: {
+          target: "ticking",
+        },
+      },
+    },
+  },
+});
+
+const Timer2 = createMachine({
+  initial: "active",
+  states: {
+    active: {
+      invoke: {
+        src: Ticker2,
+      },
+      on: {
+        PAUSE: {
+          actions: ["pauseTimer"],
+        },
+        RESUME: {
+          actions: ["incrementElapsedTime"],
+        },
+        TICK: {
+          actions: ["incrementElapsedTime"],
+        },
+      },
+    },
+  },
+});
+
+const Watch = createMachine({
+  context: {
+    elapsed: 0,
+    duration: 5,
+    interval: 1,
+  },
+  initial: "countdown",
+  states: {
+    countdown: {
+      states: {
+        running: {
+          invoke: {
+            src: Ticker,
+          },
+          on: {
+            PAUSE: {
+              target: "paused",
+            },
+            TICK: {
+              actions: ["incrementElapsedTime"],
+            },
+          },
+        },
+        paused: {
+          on: {
+            RESUME: {
+              target: "running",
+            },
+          },
+        },
+      },
+    },
+    timer: {
+      states: {
+        running: {
+          invoke: {
+            src: Ticker,
+          },
+          on: {
+            PAUSE: {
+              target: "paused",
+            },
+            TICK: {
+              actions: ["incrementElapsedTime"],
+            },
+          },
+        },
+        paused: {
+          on: {
+            RESUME: {
+              target: "running",
+            },
+          },
+        },
+      },
+    },
+  },
+});
+
+export default Timer;

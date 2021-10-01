@@ -1181,5 +1181,7 @@ export const maze1 = {
       end: { row: 15, col: 14 },
     },
   },
+  numCols: maze1Tiles[0].length,
+  numRows: maze1Tiles.length,
   pelletsRemaining: maze1PelletsRemaining,
 };
