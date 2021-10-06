@@ -144,6 +144,7 @@ const GameMachine = createMachine(
       },
       ghosts: {},
       deadGhosts: [],
+      revivedGhosts: [],
       maze: maze1,
       waitingForResponse: [],
       gameConfig: {
@@ -345,6 +346,9 @@ const GameMachine = createMachine(
               },
               LOSE_LIFE: {
                 target: "lostLife",
+              },
+              GHOST_HAS_RETURNED_HOME: {
+                actions: ["removeGhostFromDeadGhosts", "addRevivedGhost"],
               },
             },
             states: {
@@ -667,7 +671,7 @@ const GameMachine = createMachine(
                   checkCollisions: {
                     entry: [
                       pure((ctx) => {
-                        const { pacman, ghosts, deadGhosts } = ctx;
+                        const { pacman, ghosts } = ctx;
                         const checkCollision = (a, b) => {
                           if (
                             a.position.row === b.position.row &&
@@ -676,23 +680,18 @@ const GameMachine = createMachine(
                             return true;
                           }
                         };
-                        const aliveGhosts = Object.keys(ghosts).filter(
-                          (ghostId) => !deadGhosts.includes(ghostId)
+
+                        const ghostsCollidedWith = Object.keys(ghosts).filter(
+                          (ghostId) => checkCollision(pacman, ghosts[ghostId])
                         );
-                        let ghostsCollidedWith = [];
-                        aliveGhosts.forEach((ghostName) => {
-                          if (checkCollision(pacman, ghosts[ghostName])) {
-                            ghostsCollidedWith.push(ghostName);
-                          }
-                        });
 
                         return ghostsCollidedWith.length > 0
-                          ? [
+                          ? ghostsCollidedWith.map((ghost) =>
                               send({
                                 type: "GHOST_COLLISION",
-                                ghosts: ghostsCollidedWith,
-                              }),
-                            ]
+                                ghosts: [ghost],
+                              })
+                            )
                           : [
                               send({
                                 type: "NO_GHOST_COLLISIONS",
@@ -764,7 +763,7 @@ const GameMachine = createMachine(
                   src: () => (callback) => {
                     const interval = setInterval(() => {
                       callback("TICK");
-                    }, 1000 / 40);
+                    }, 1000 / 60);
 
                     return () => {
                       clearInterval(interval);
@@ -840,17 +839,24 @@ const GameMachine = createMachine(
                     states: {
                       playing: {
                         on: {
-                          GHOST_COLLISION: {
-                            target: "paused",
-                            actions: [
-                              "clearWaitingFor",
-                              "pauseCharacters",
-                              "notifyGhostsDead",
-                              "updateDeadGhosts",
-                              "updateGhostsEatenCount",
-                              "pauseFrightenedTimer",
-                            ],
-                          },
+                          GHOST_COLLISION: [
+                            {
+                              cond: "ghostHasBeenRevived",
+                              actions: [send("LOSE_LIFE"), "pauseCharacters"],
+                            },
+                            {
+                              cond: "ghostIsAlive",
+                              target: "paused",
+                              actions: [
+                                "clearWaitingFor",
+                                "pauseCharacters",
+                                "notifyGhostsDead",
+                                "updateDeadGhosts",
+                                "updateGhostsEatenCount",
+                                "pauseFrightenedTimer",
+                              ],
+                            },
+                          ],
                         },
                       },
                       paused: {
@@ -886,6 +892,7 @@ const GameMachine = createMachine(
                         actions: [
                           "notifyEndFrightenedMode",
                           "resumeScatterChaseTimer",
+                          "clearRevivedGhosts",
                         ],
                       },
                     },
@@ -1046,6 +1053,26 @@ const GameMachine = createMachine(
       updateDeadGhosts: assign({
         deadGhosts: (ctx, event) => {
           return [...ctx.deadGhosts, ...event.ghosts];
+        },
+      }),
+      addRevivedGhost: assign({
+        revivedGhosts: (ctx, event) => {
+          return [...ctx.revivedGhosts, event.ghost];
+        },
+      }),
+      clearRevivedGhosts: assign({
+        revivedGhosts: (ctx, event) => {
+          return [];
+        },
+      }),
+      removeGhostFromDeadGhosts: assign({
+        deadGhosts: (ctx, event) => {
+          console.log(
+            "dead ghosts",
+            event,
+            ctx.deadGhosts.filter((ghost) => ghost !== event.ghost)
+          );
+          return ctx.deadGhosts.filter((ghost) => ghost !== event.ghost);
         },
       }),
       setTileToEmpty: assign({
@@ -1229,6 +1256,9 @@ const GameMachine = createMachine(
       }),
     },
     guards: {
+      ghostIsAlive: (ctx, event) => !ctx.deadGhosts.includes(event.ghosts[0]),
+      ghostHasBeenRevived: (ctx, event) =>
+        ctx.revivedGhosts.includes(event.ghosts[0]),
       noLivesLost: (ctx, event) => ctx.livesRemaining === NUMBER_OF_LIVES,
       allResponsesReceived: (ctx, event) =>
         ctx.waitingForResponse.length === 1 &&
