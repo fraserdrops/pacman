@@ -567,10 +567,10 @@ const PacmanMachine = createMachine(
       maze: [],
       framesToSkip: 0,
       config: {
-        baseSpeed: 50,
+        baseSpeed: 80,
         speedPercentage: {
-          frightened: 0.8,
-          normal: 0.9,
+          frightened: 0.9,
+          normal: 0.8,
         },
       },
     },

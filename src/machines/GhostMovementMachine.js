@@ -142,6 +142,7 @@ const GhostMovementMachine = createMachine(
                             // then looks ahead to choose a direction for when it reachs the next tile
                             actions: [
                               "reverseDirection",
+                              "chooseNextDirectionReversingSequence",
                               "sendReversingFinished",
                             ],
                           },
@@ -367,6 +368,20 @@ const GhostMovementMachine = createMachine(
             position,
             direction,
             targetTile,
+          };
+        },
+        { to: "direction" }
+      ),
+      chooseNextDirectionReversingSequence: send(
+        (ctx, event) => {
+          const { maze, position, direction, targetTile } = ctx;
+          return {
+            type: "CALCULATE_NEXT_DIRECTION",
+            maze,
+            position,
+            direction,
+            targetTile,
+            useCurrentTile: true,
           };
         },
         { to: "direction" }

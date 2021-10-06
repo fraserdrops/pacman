@@ -1,4 +1,4 @@
-import { actions, assign, createMachine, send } from "xstate";
+import { actions, assign, createMachine, send, sendParent } from "xstate";
 import { isPositionWithinZone } from "../util/characterUtil";
 import GhostMovementMachine from "./GhostMovementMachine";
 const { raise, respond, choose, pure } = actions;
@@ -12,6 +12,8 @@ const not = (guard) => ({
   type: "not",
   guard,
 });
+
+const createZones = () => {};
 
 const GhostMachine = createMachine(
   {
@@ -47,12 +49,12 @@ const GhostMachine = createMachine(
       chaseModeHasChanged: false,
       maze: [],
       gameConfig: {
-        baseSpeed: 35,
+        baseSpeed: 80,
         speedPercentage: {
           tunnel: 0.4,
           normal: 0.75,
           frightened: 0.5,
-          returning: 4,
+          returning: 0.2,
         },
       },
       ghostConfig: {
@@ -112,6 +114,9 @@ const GhostMachine = createMachine(
                   CHASE: {
                     target: "regular",
                   },
+                  FRIGHTENED: {
+                    target: "frightStarted",
+                  },
                 },
               },
               dead: {
@@ -155,33 +160,16 @@ const GhostMachine = createMachine(
             actions: ["setPosition"],
           },
           PAUSE: {
-            actions: [
-              send("PAUSE", { to: "movement" }),
-              () => console.log("PAUSE PUASE"),
-            ],
+            actions: ["pauseMovement"],
           },
           RESUME: {
-            actions: [send("RESUME", { to: "movement" })],
+            actions: ["resumeMovement"],
           },
           UPDATE_NORMAL_SPEED: {
-            actions: [
-              assign({
-                gameConfig: (ctx, event) => ({
-                  ...ctx.gameConfig,
-                  speedPercentage: {
-                    ...ctx.gameConfig.speedPercentage,
-                    normal: event.speedPercentage,
-                  },
-                }),
-              }),
-            ],
+            actions: ["updateNormalSpeedConfig"],
           },
           UPDATE_SCATTER_TARGETING: {
-            actions: [
-              assign({
-                scatterTargeting: (ctx, event) => event.targetingModule,
-              }),
-            ],
+            actions: ["updateScatterTargetingModule"],
             internal: false,
           },
         },
@@ -238,7 +226,6 @@ const GhostMachine = createMachine(
                           },
                           {
                             target: "outside",
-                            actions: [""],
                           },
                         ],
                       },
@@ -254,17 +241,11 @@ const GhostMachine = createMachine(
                         },
                       },
                       inside: {
-                        // entry: [
-                        //   "sendOnTargetTile",
-                        //   () => console.log("SEND ON"),
-                        // ],
-                        exit: [""],
                         on: {
                           MOVEMENT_FINISHED: [
                             {
                               cond: not("onTargetTile"),
                               target: "outside",
-                              actions: [""],
                             },
                           ],
                         },
@@ -415,15 +396,9 @@ const GhostMachine = createMachine(
                   },
                 },
                 states: {
-                  chase: {
-                    entry: [() => console.log("CHASE BABY")],
-                  },
-                  scatter: {
-                    entry: [() => console.log("SCATTER BABY")],
-                  },
-                  frightened: {
-                    entry: [() => console.log("FRIGHT BABY")],
-                  },
+                  chase: {},
+                  scatter: {},
+                  frightened: {},
                 },
               },
               chaseStatus: {
@@ -439,21 +414,13 @@ const GhostMachine = createMachine(
                       },
                       OUTSIDE_GHOST_HOUSE: {
                         target: "normal",
-                        actions: [
-                          // "setTargetTileExitLeft",
-                          "seekTargetTile",
-                          () => console.log("LEFT EXIT"),
-                        ],
+                        actions: ["seekTargetTile"],
                       },
                     },
-                    exit: [send("RESUME", { to: "movement" })],
+                    exit: ["resumeMovement"],
                   },
                   atHome: {
-                    entry: [
-                      "setHomeTargetTile",
-                      // "applyAtHomeMovementRestrictions",
-                      "blockGhostHouseEntrance",
-                    ],
+                    entry: ["setHomeTargetTile", "blockGhostHouseEntrance"],
                     on: {
                       LEAVE_HOME: {
                         target: "leavingHome",
@@ -464,7 +431,6 @@ const GhostMachine = createMachine(
                         ],
                       },
                     },
-                    // exit: ["removeAtHomeMovementRestrictions"],
                   },
                   leavingHome: {
                     initial: "headingForHouseEntrance",
@@ -491,7 +457,6 @@ const GhostMachine = createMachine(
                       },
                       exitingHouse: {
                         entry: [
-                          () => console.log("EXITING HOUSE"),
                           choose(
                             [
                               {
@@ -512,7 +477,6 @@ const GhostMachine = createMachine(
                         },
                       },
                       exitComplete: {
-                        entry: [() => console.log("EXITING COMOPLETE")],
                         type: "final",
                       },
                     },
@@ -553,18 +517,7 @@ const GhostMachine = createMachine(
                           id: "targetingModule",
                           src: (ctx) => ctx.ghostConfig.chaseTargeting,
                         },
-                        entry: [
-                          send(
-                            (ctx) => ({
-                              type: "CHANGE_SPEED",
-                              intervalMS:
-                                ctx.gameConfig.baseSpeed /
-                                ctx.gameConfig.speedPercentage.normal,
-                            }),
-                            { to: "movement" }
-                          ),
-                          // "calculateTargetTile",
-                        ],
+                        entry: ["setNormalSpeed"],
                         on: {
                           SCATTER: {
                             target: "scatter",
@@ -585,24 +538,8 @@ const GhostMachine = createMachine(
                           },
                           UPDATE_NORMAL_SPEED: {
                             actions: [
-                              assign({
-                                gameConfig: (ctx, event) => ({
-                                  ...ctx.gameConfig,
-                                  speedPercentage: {
-                                    ...ctx.gameConfig.speedPercentage,
-                                    normal: event.speedPercentage,
-                                  },
-                                }),
-                              }),
-                              send(
-                                (ctx) => ({
-                                  type: "CHANGE_SPEED",
-                                  intervalMS:
-                                    ctx.gameConfig.baseSpeed /
-                                    ctx.gameConfig.speedPercentage.normal,
-                                }),
-                                { to: "movement" }
-                              ),
+                              "updateNormalSpeedConfig",
+                              "setNormalSpeed",
                             ],
                           },
                           NEW_TARGET_TILE: {
@@ -615,18 +552,7 @@ const GhostMachine = createMachine(
                           id: "targetingModule",
                           src: (ctx) => ctx.ghostConfig.scatterTargeting,
                         },
-                        entry: [
-                          "setTargetTileScatterMode",
-                          send(
-                            (ctx) => ({
-                              type: "CHANGE_SPEED",
-                              intervalMS:
-                                ctx.gameConfig.baseSpeed /
-                                ctx.gameConfig.speedPercentage.normal,
-                            }),
-                            { to: "movement" }
-                          ),
-                        ],
+                        entry: ["setTargetTileScatterMode", "setNormalSpeed"],
                         on: {
                           CHASE: {
                             target: "chase",
@@ -644,33 +570,12 @@ const GhostMachine = createMachine(
                           },
                           UPDATE_NORMAL_SPEED: {
                             actions: [
-                              assign({
-                                gameConfig: (ctx, event) => ({
-                                  ...ctx.gameConfig,
-                                  speedPercentage: {
-                                    ...ctx.gameConfig.speedPercentage,
-                                    normal: event.speedPercentage,
-                                  },
-                                }),
-                              }),
-                              send(
-                                (ctx) => ({
-                                  type: "CHANGE_SPEED",
-                                  intervalMS:
-                                    ctx.gameConfig.baseSpeed /
-                                    ctx.gameConfig.speedPercentage.normal,
-                                }),
-                                { to: "movement" }
-                              ),
+                              "updateNormalSpeedConfig",
+                              "setNormalSpeed",
                             ],
                           },
                           UPDATE_SCATTER_TARGETING: {
-                            actions: [
-                              assign({
-                                scatterTargeting: (ctx, event) =>
-                                  event.targetingModule,
-                              }),
-                            ],
+                            actions: ["updateScatterTargetingModule"],
                             internal: false,
                           },
                           NEW_TARGET_TILE: {
@@ -680,24 +585,8 @@ const GhostMachine = createMachine(
                       },
                       frightened: {
                         entry: [
-                          send(
-                            (ctx) => ({
-                              type: "CHANGE_SPEED",
-                              intervalMS:
-                                ctx.gameConfig.baseSpeed /
-                                ctx.gameConfig.speedPercentage.frightened,
-                            }),
-                            { to: "movement" }
-                          ),
-                          send(
-                            (ctx) => ({
-                              type: "RANDOM_MOVEMENT",
-                              intervalMS:
-                                ctx.gameConfig.baseSpeed /
-                                ctx.gameConfig.speedPercentage.frightened,
-                            }),
-                            { to: "movement" }
-                          ),
+                          "setFrightenedSpeed",
+                          "activateRandomMovement",
                           "startReversingSequence",
                         ],
                         on: {
@@ -724,29 +613,11 @@ const GhostMachine = createMachine(
                         actions: [
                           "setHomeReturnTargetTile",
                           "seekTargetTile",
-                          send("RESUME", { to: "movement" }),
+                          "resumeMovement",
                           "unblockGhostHouseEntrance",
-                          send(
-                            (ctx) => ({
-                              type: "CHANGE_SPEED",
-                              intervalMS:
-                                ctx.gameConfig.baseSpeed /
-                                ctx.gameConfig.speedPercentage.returning,
-                            }),
-                            { to: "movement" }
-                          ),
-                          send(
-                            (ctx) => ({
-                              type: "OVERRIDE_SPEED_MULTIPLIERS",
-                            }),
-                            { to: "movement" }
-                          ),
-                          send(
-                            (ctx) => ({
-                              type: "IGNORE_DIRECTION_RESTRICTIONS",
-                            }),
-                            { to: "movement" }
-                          ),
+                          "setReturningHomeSpeed",
+                          "overrideSpeedMultipliers",
+                          "ignoreDirectionRestrictions",
                         ],
                       },
                     },
@@ -755,15 +626,10 @@ const GhostMachine = createMachine(
                     on: {
                       ON_TARGET_TILE: [
                         {
-                          // cond: "reachedHomeTile",
                           target: "leavingHome",
                           actions: [
-                            send(
-                              (ctx) => ({
-                                type: "APPLY_DIRECTION_RESTRICTIONS",
-                              }),
-                              { to: "movement" }
-                            ),
+                            "applyDrectionRestrictions",
+                            "notifyGameReturnedHome",
                           ],
                         },
                       ],
@@ -781,6 +647,78 @@ const GhostMachine = createMachine(
   },
   {
     actions: {
+      setNormalSpeed: send(
+        (ctx) => ({
+          type: "CHANGE_SPEED",
+          intervalMS:
+            1000 /
+            (ctx.gameConfig.baseSpeed * ctx.gameConfig.speedPercentage.normal),
+        }),
+        { to: "movement" }
+      ),
+      setFrightenedSpeed: send(
+        (ctx) => ({
+          type: "CHANGE_SPEED",
+          intervalMS:
+            1000 /
+            (ctx.gameConfig.baseSpeed *
+              ctx.gameConfig.speedPercentage.frightened),
+        }),
+        { to: "movement" }
+      ),
+      setReturningHomeSpeed: send(
+        (ctx) => ({
+          type: "CHANGE_SPEED",
+          intervalMS:
+            1000 /
+            (ctx.gameConfig.baseSpeed *
+              ctx.gameConfig.speedPercentage.returning),
+        }),
+        { to: "movement" }
+      ),
+      activateRandomMovement: send(
+        (ctx) => ({
+          type: "RANDOM_MOVEMENT",
+          intervalMS:
+            ctx.gameConfig.baseSpeed /
+            ctx.gameConfig.speedPercentage.frightened,
+        }),
+        { to: "movement" }
+      ),
+      applyDrectionRestrictions: send(
+        (ctx) => ({
+          type: "APPLY_DIRECTION_RESTRICTIONS",
+        }),
+        { to: "movement" }
+      ),
+      overrideSpeedMultipliers: send(
+        (ctx) => ({
+          type: "OVERRIDE_SPEED_MULTIPLIERS",
+        }),
+        { to: "movement" }
+      ),
+      ignoreDirectionRestrictions: send(
+        (ctx) => ({
+          type: "IGNORE_DIRECTION_RESTRICTIONS",
+        }),
+        { to: "movement" }
+      ),
+      notifyGameReturnedHome: sendParent((ctx) => {
+        console.log("notify returned");
+        return {
+          type: "GHOST_HAS_RETURNED_HOME",
+          ghost: ctx.character,
+        };
+      }),
+      updateNormalSpeedConfig: assign({
+        gameConfig: (ctx, event) => ({
+          ...ctx.gameConfig,
+          speedPercentage: {
+            ...ctx.gameConfig.speedPercentage,
+            normal: event.speedPercentage,
+          },
+        }),
+      }),
       respondWithUpdatedPosition: respond((ctx) => {
         return {
           type: "UPDATE_POSITION",
@@ -790,6 +728,8 @@ const GhostMachine = createMachine(
           nextDirection: ctx.nextDirection,
         };
       }),
+      pauseMovement: send("PAUSE", { to: "movement" }),
+      resumeMovement: send("RESUME", { to: "movement" }),
       chaseModeHasChanged: assign({ chaseModeHasChanged: () => true }),
       switchToStrobeMovement: send("", { to: "movement" }),
       seekTargetTile: send("SEEK_TARGET_TILE", { to: "movement" }),
@@ -820,22 +760,9 @@ const GhostMachine = createMachine(
           );
         });
       }),
-      applyAtHomeMovementRestrictions: send(
-        (ctx, event) => ({
-          type: "ADD_RESTRICTED_DIRECTIONS",
-          zone: ctx.maze.zones.ghostHouse,
-          zoneKey: "ghostHouse",
-          restrictedDirections: ["left", "right"],
-        }),
-        { to: "movement" }
-      ),
-      removeAtHomeMovementRestrictions: send(
-        {
-          type: "REMOVE_RESTRICTED_DIRECTIONS",
-          directions: ["left", "right"],
-        },
-        { to: "movement" }
-      ),
+      updateScatterTargetingModule: assign({
+        scatterTargeting: (ctx, event) => event.targetingModule,
+      }),
       applyTunnelRestrictions: send(
         { type: "SPECIAL_SPEED", specialKey: "tunnel", specialMultiplier: 0.5 },
         { to: "movement" }
@@ -844,7 +771,6 @@ const GhostMachine = createMachine(
         { type: "REMOVE_SPECIAL_SPEED", specialKey: "tunnel" },
         { to: "movement" }
       ),
-      sendMovementFinished: send("MOVEMENT_FINISHED"),
       setPosition: assign({
         position: (ctx, event) => event.position,
       }),
@@ -935,16 +861,6 @@ const GhostMachine = createMachine(
         }),
         { to: "movement" }
       ),
-
-      // setTargetTileScatterMode: assign({
-      //   targetTile: (ctx) => ctx.ghostConfig.scatterTargetTile,
-      // }),
-      // updateTargetTileNormalMode: assign({
-      //   targetTile: (ctx) => ctx.ghostConfig.targetTile,
-      // }),
-      // setHomeTargetTile: assign({
-      //   targetTile: (ctx) => ctx.ghostConfig.homeTile,
-      // }),
     },
     guards: {
       get every() {
@@ -967,12 +883,6 @@ const GhostMachine = createMachine(
         return (
           targetTile.row === ctx.position.row &&
           targetTile.col === ctx.position.col
-        );
-      },
-      reachedHomeTile: (ctx) => {
-        const { homeTile } = ctx.ghostConfig;
-        return (
-          homeTile.row === ctx.position.row && homeTile.col === ctx.position.col
         );
       },
       inRedZone: (ctx) => {

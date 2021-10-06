@@ -122,16 +122,21 @@ function chooseNextDirection({
   targetTile,
   forbiddenZones,
   restrictedZones,
+  useCurrentTile,
 }) {
   // the ghosts look one tile ahead and choose what direction they will take when they get to the next tile
 
   let nextDirection = "up";
-  const nextPosition = getProjectedPosition(
+  let nextPosition = getProjectedPosition(
     maze,
     { direction, row: position.row, col: position.col },
     direction,
     true
   );
+
+  if (useCurrentTile) {
+    nextPosition = position;
+  }
 
   let restrictedDirectionsAtNextPosition = [];
   Object.keys(restrictedZones).forEach((zoneKey) => {

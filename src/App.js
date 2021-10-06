@@ -64,8 +64,8 @@ function App() {
   return (
     <div className="App">
       <svg
-        width="700px"
-        height="70vh"
+        width="800px"
+        height="90vh"
         viewBox="0 0 300 300"
         onKeyDown={(e) => {
           if (e.key === "ArrowUp") {
