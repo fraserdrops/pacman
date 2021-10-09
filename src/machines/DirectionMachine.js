@@ -52,11 +52,15 @@ const DirectionMachine = createMachine(
         return { type: "UPDATE_NEXT_DIRECTION", nextDirection };
       }),
       calculateNextRandomDirection: sendParent((ctx, event) => {
+        const { restrictedZones, forbiddenZones } = ctx;
+
         const { maze, position, direction } = event;
         const nextDirection = chooseNextRandomDirection({
           maze,
           position,
           direction,
+          restrictedZones,
+          forbiddenZones,
         });
         return { type: "UPDATE_NEXT_DIRECTION", nextDirection };
       }),
@@ -223,7 +227,12 @@ function chooseNextDirection({
   return nextDirection;
 }
 
-function chooseNextRandomDirection({ maze, position, direction }) {
+function chooseNextRandomDirection({
+  maze,
+  position,
+  direction,
+  forbiddenZones,
+}) {
   // the ghosts look one tile ahead and choose what direction they will take when they get to the next tile
 
   const nextPosition = getProjectedPosition(
@@ -241,7 +250,10 @@ function chooseNextRandomDirection({ maze, position, direction }) {
       true
     );
     const isWall = getTileType(maze.tiles, projectedPosition) === "wall";
-    return !isWall;
+    const isRestrictedTile = Object.values(forbiddenZones).some(({ zone }) =>
+      isPositionWithinZone(projectedPosition, zone)
+    );
+    return !isWall && !isRestrictedTile;
   });
 
   // disallow reversing, unless reversing is the only option

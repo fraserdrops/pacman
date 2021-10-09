@@ -37,7 +37,6 @@ const GhostMachine = createMachine(
       scatterTargeting: undefined,
       chaseTargeting: undefined,
       direction: "left",
-      scatterModeTile: {},
       nextDirection: "left",
       speed: {},
       gameState: {},
@@ -46,6 +45,7 @@ const GhostMachine = createMachine(
         speed: {},
         directions: {},
       },
+      queuedGameMode: "scatter",
       chaseModeHasChanged: false,
       maze: [],
       gameConfig: {
@@ -54,7 +54,8 @@ const GhostMachine = createMachine(
           tunnel: 0.4,
           normal: 0.75,
           frightened: 0.5,
-          returning: 0.2,
+          returning: 2,
+          ghostHouse: 0.5,
         },
       },
       ghostConfig: {
@@ -206,7 +207,10 @@ const GhostMachine = createMachine(
                 targetTile: (ctx, event) => ctx.ghostConfig.targetTile,
                 maze: (ctx, event) => ctx.maze,
                 direction: (ctx, event) => ctx.direction,
-                gameConfig: (ctx) => ctx.gameConfig,
+                initialSpeed: (ctx) =>
+                  1000 /
+                  (ctx.gameConfig.baseSpeed *
+                    ctx.gameConfig.speedPercentage.ghostHouse),
               },
             },
             states: {
@@ -235,7 +239,10 @@ const GhostMachine = createMachine(
                             {
                               cond: "onTargetTile",
                               target: "inside",
-                              actions: ["sendOnTargetTile"],
+                              actions: [
+                                "sendOnTargetTile",
+                                () => console.log("ON TARGET TILE"),
+                              ],
                             },
                           ],
                         },
@@ -376,34 +383,20 @@ const GhostMachine = createMachine(
                   },
                 },
               },
-              gameChaseMode: {
-                id: "gameChaseMode",
-                initial: "chase",
-                on: {
-                  SCATTER: {
-                    target: ".scatter",
-                    actions: ["chaseModeHasChanged"],
-                  },
-                  CHASE: {
-                    target: ".chase",
-                    actions: ["chaseModeHasChanged"],
-                  },
-                  FRIGHTENED: {
-                    target: ".frightened",
-                  },
-                  MOVEMENT_FINISHED: {
-                    actions: ["setPosition", "setDirection"],
-                  },
-                },
-                states: {
-                  chase: {},
-                  scatter: {},
-                  frightened: {},
-                },
-              },
               chaseStatus: {
                 initial: "init",
                 id: "chaseStatus",
+                on: {
+                  MOVEMENT_FINISHED: {
+                    actions: ["setPosition", "setDirection"],
+                  },
+                  SCATTER: {
+                    actions: ["queueScatterMode", "setChaseModeHasChanged"],
+                  },
+                  CHASE: {
+                    actions: ["queueChaseMode", "setChaseModeHasChanged"],
+                  },
+                },
                 states: {
                   init: {
                     entry: ["applyRedZoneRestrictions"],
@@ -414,7 +407,7 @@ const GhostMachine = createMachine(
                       },
                       OUTSIDE_GHOST_HOUSE: {
                         target: "normal",
-                        actions: ["seekTargetTile"],
+                        actions: ["seekTargetTile", "blockGhostHouseEntrance"],
                       },
                     },
                     exit: ["resumeMovement"],
@@ -422,10 +415,12 @@ const GhostMachine = createMachine(
                   atHome: {
                     entry: ["setHomeTargetTile", "blockGhostHouseEntrance"],
                     on: {
+                      FRIGHTENED: {
+                        actions: ["queueFrightMode"],
+                      },
                       LEAVE_HOME: {
                         target: "leavingHome",
                         actions: [
-                          "setTargetTileHouseEntrance",
                           "seekTargetTile",
                           "unblockGhostHouseEntrance",
                         ],
@@ -434,20 +429,31 @@ const GhostMachine = createMachine(
                   },
                   leavingHome: {
                     initial: "headingForHouseEntrance",
+                    on: {
+                      FRIGHTENED: {
+                        actions: ["queueFrightMode"],
+                      },
+                    },
                     states: {
                       headingForHouseEntrance: {
                         entry: [
-                          choose(
-                            [
-                              {
-                                actions: ["setTargetTileHouseRightEntrance"],
-                                cond: "chaseModeHasChanged",
-                              },
-                            ],
+                          choose([
                             {
-                              actions: ["setTargetTileHouseLeftEntrance"],
-                            }
-                          ),
+                              actions: [
+                                "setTargetTileHouseRightEntrance",
+                                (ctx) =>
+                                  console.log("Right ENTRANCE", ctx.character),
+                              ],
+                              cond: "chaseModeHasChanged",
+                            },
+                            {
+                              actions: [
+                                "setTargetTileHouseLeftEntrance",
+                                (ctx) =>
+                                  console.log("left ENTRANCE", ctx.character),
+                              ],
+                            },
+                          ]),
                         ],
                         on: {
                           ON_TARGET_TILE: {
@@ -457,22 +463,37 @@ const GhostMachine = createMachine(
                       },
                       exitingHouse: {
                         entry: [
-                          choose(
-                            [
-                              {
-                                actions: ["setTargetTileExitRight"],
-                                cond: "chaseModeHasChanged",
-                              },
-                            ],
+                          (ctx) => console.log("EXITING HOUSE", ctx.character),
+                          choose([
                             {
-                              actions: ["setTargetTileExitLeft"],
-                            }
-                          ),
+                              cond: "chaseModeHasChanged",
+                              actions: [
+                                "setTargetTileExitRight",
+                                (ctx) =>
+                                  console.log("exit right", ctx.character),
+                              ],
+                            },
+                            {
+                              actions: [
+                                // selected when "cond1" is false and "cond2" is true
+                                "setTargetTileExitLeft",
+                                (ctx) =>
+                                  console.log("exit left", ctx.character),
+                              ],
+                            },
+                          ]),
                         ],
                         on: {
                           ON_TARGET_TILE: {
                             target: "exitComplete",
-                            actions: ["blockGhostHouseEntrance"],
+                            actions: [
+                              "blockGhostHouseEntrance",
+                              (ctx) =>
+                                console.log(
+                                  "GHOST ENTRANCE BLOCKED",
+                                  ctx.character
+                                ),
+                            ],
                           },
                         },
                       },
@@ -482,9 +503,13 @@ const GhostMachine = createMachine(
                     },
                     onDone: {
                       target: "normal",
+                      actions: [
+                        (ctx) => console.log("EXIT COMPLETE", ctx.character),
+                      ],
                     },
                   },
                   normal: {
+                    entry: [(ctx) => console.log("NORMAL MODE", ctx.character)],
                     invoke: {
                       id: "targetingModule",
                       src: (ctx) => ctx.scatterTargeting,
@@ -500,15 +525,15 @@ const GhostMachine = createMachine(
                         always: [
                           {
                             target: "chase",
-                            in: "#ghostMachine.core.playing.gameChaseMode.chase",
+                            cond: "chaseModeQueued",
                           },
                           {
                             target: "scatter",
-                            in: "#ghostMachine.core.playing.gameChaseMode.scatter",
+                            cond: "scatterModeQueued",
                           },
                           {
                             target: "frightened",
-                            in: "#ghostMachine.core.playing.gameChaseMode.frightened",
+                            cond: "frightModeQueued",
                           },
                         ],
                       },
@@ -517,7 +542,12 @@ const GhostMachine = createMachine(
                           id: "targetingModule",
                           src: (ctx) => ctx.ghostConfig.chaseTargeting,
                         },
-                        entry: ["setNormalSpeed"],
+                        entry: [
+                          "setNormalSpeed",
+                          "queueChaseMode",
+                          "setChaseModeHasChanged",
+                          () => console.log("CHASE MODE"),
+                        ],
                         on: {
                           SCATTER: {
                             target: "scatter",
@@ -552,7 +582,13 @@ const GhostMachine = createMachine(
                           id: "targetingModule",
                           src: (ctx) => ctx.ghostConfig.scatterTargeting,
                         },
-                        entry: ["setTargetTileScatterMode", "setNormalSpeed"],
+                        entry: [
+                          "setTargetTileScatterMode",
+                          "setNormalSpeed",
+                          "queueScatterMode",
+                          "setChaseModeHasChanged",
+                          () => console.log("SCATTER MODE"),
+                        ],
                         on: {
                           CHASE: {
                             target: "chase",
@@ -630,6 +666,7 @@ const GhostMachine = createMachine(
                           actions: [
                             "applyDrectionRestrictions",
                             "notifyGameReturnedHome",
+                            "setGhostHouseSpeed",
                           ],
                         },
                       ],
@@ -647,6 +684,16 @@ const GhostMachine = createMachine(
   },
   {
     actions: {
+      queueScatterMode: assign({
+        queuedGameMode: "scatter",
+      }),
+      queueChaseMode: assign({
+        queuedGameMode: "chase",
+      }),
+      queueFrightMode: assign({
+        queuedGameMode: "frightened",
+      }),
+      setChaseModeHasChanged: assign({ chaseModeHasChanged: true }),
       setNormalSpeed: send(
         (ctx) => ({
           type: "CHANGE_SPEED",
@@ -673,6 +720,16 @@ const GhostMachine = createMachine(
             1000 /
             (ctx.gameConfig.baseSpeed *
               ctx.gameConfig.speedPercentage.returning),
+        }),
+        { to: "movement" }
+      ),
+      setGhostHouseSpeed: send(
+        (ctx) => ({
+          type: "CHANGE_SPEED",
+          intervalMS:
+            1000 /
+            (ctx.gameConfig.baseSpeed *
+              ctx.gameConfig.speedPercentage.ghostHouse),
         }),
         { to: "movement" }
       ),
@@ -730,7 +787,6 @@ const GhostMachine = createMachine(
       }),
       pauseMovement: send("PAUSE", { to: "movement" }),
       resumeMovement: send("RESUME", { to: "movement" }),
-      chaseModeHasChanged: assign({ chaseModeHasChanged: () => true }),
       switchToStrobeMovement: send("", { to: "movement" }),
       seekTargetTile: send("SEEK_TARGET_TILE", { to: "movement" }),
       applyRedZoneRestrictions: pure((ctx) => {
@@ -798,6 +854,7 @@ const GhostMachine = createMachine(
         (ctx) => ({
           type: "CHANGE_TARGET_TILE",
           targetTile: ctx.ghostConfig.targetTile,
+          character: ctx.character,
         }),
         { to: "movement" }
       ),
@@ -805,6 +862,7 @@ const GhostMachine = createMachine(
         (ctx) => ({
           type: "CHANGE_TARGET_TILE",
           targetTile: ctx.ghostConfig.leftExitTile,
+          character: ctx.character,
         }),
         { to: "movement" }
       ),
@@ -812,6 +870,7 @@ const GhostMachine = createMachine(
         (ctx) => ({
           type: "CHANGE_TARGET_TILE",
           targetTile: ctx.ghostConfig.rightExitTile,
+          character: ctx.character,
         }),
         { to: "movement" }
       ),
@@ -819,6 +878,7 @@ const GhostMachine = createMachine(
         (ctx) => ({
           type: "CHANGE_TARGET_TILE",
           targetTile: ctx.ghostConfig.leftEntranceTile,
+          character: ctx.character,
         }),
         { to: "movement" }
       ),
@@ -826,6 +886,7 @@ const GhostMachine = createMachine(
         (ctx) => ({
           type: "CHANGE_TARGET_TILE",
           targetTile: ctx.ghostConfig.rightEntranceTile,
+          character: ctx.character,
         }),
         { to: "movement" }
       ),
@@ -833,6 +894,7 @@ const GhostMachine = createMachine(
         (ctx) => ({
           type: "CHANGE_TARGET_TILE",
           targetTile: ctx.ghostConfig.homeReturnTile,
+          character: ctx.character,
         }),
         { to: "movement" }
       ),
@@ -875,6 +937,9 @@ const GhostMachine = createMachine(
           return !this[guard](ctx, event);
         };
       },
+      frightModeQueued: (ctx) => ctx.queuedGameMode === "frightened",
+      scatterModeQueued: (ctx) => ctx.queuedGameMode === "scatter",
+      chaseModeQueued: (ctx) => ctx.queuedGameMode === "chase",
       onTargetTile: (ctx, event) => {
         const { targetTile } = event;
         if (!targetTile) {

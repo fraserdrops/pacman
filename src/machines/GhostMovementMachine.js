@@ -38,13 +38,20 @@ const GhostMovementMachine = createMachine(
       nextDirection: "left",
       targetTile: undefined,
       gameConfig: {},
+      initialSpeed: undefined,
     },
     on: {
       UPDATE_NEXT_DIRECTION: {
         actions: ["updateNextDirection"],
       },
       CHANGE_TARGET_TILE: {
-        actions: ["setTargetTile"],
+        actions: [
+          "setTargetTile",
+          (ctx, event) => {
+            if (event.character === "pinky")
+              console.log("NEW TARGET TILE", event.targetTile);
+          },
+        ],
       },
       CHANGE_SPEED: {
         actions: [forwardTo("speed")],
@@ -86,9 +93,7 @@ const GhostMovementMachine = createMachine(
         id: "speed",
         data: {
           ...CharacterSpeedMachine.context,
-          currentBaseInterval: (ctx, event) =>
-            1000 /
-            (ctx.gameConfig.speedPercentage.normal * ctx.gameConfig.baseSpeed),
+          currentBaseInterval: (ctx, event) => ctx.initialSpeed,
           callbackEventName: "TICK",
         },
       },

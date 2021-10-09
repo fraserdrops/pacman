@@ -75,7 +75,7 @@ const Ghost = React.memo((props) => {
           />
         )}
       </g>
-      <g
+      {/* <g
         transform={`translate(${position.col * tileSize}
     ${position.row * tileSize})`}
       >
@@ -88,7 +88,7 @@ const Ghost = React.memo((props) => {
     ${position.row * tileSize + position.rowOffset - 0.5})`}
       >
         <circle r="1" cx="0" cy="0" fill="yellow" />
-      </g>
+      </g> */}
     </>
   );
 });

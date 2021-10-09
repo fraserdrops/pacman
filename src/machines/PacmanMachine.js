@@ -636,6 +636,22 @@ const PacmanMachine = createMachine(
                 actions: [send("RESUME", { to: "movement" })],
               },
             },
+            // states: {
+            //   normal: {
+            //     on: {
+            //       FRIGHTENED: {
+            //         target: 'frightened',
+            //         actions: ['changeToFrightSpeed']
+            //       }
+            //     }
+            //   },
+            //   frightened: {
+            //     SCATTER: {
+            //       target: 'normal',
+
+            //     }
+            //   }
+            // }
           },
           dead: {
             on: {
@@ -768,12 +784,11 @@ const PacmanMachine = createMachine(
       }),
       changeToFrightSpeed: send((ctx) => ({
         type: "CHANGE_SPEED",
-        intervalMS:
-          ctx.config.speedPercentage.frightened * ctx.config.baseSpeed,
+        intervalMS: ctx.level.speedPercentage.frightened * ctx.config.baseSpeed,
       })),
       changeToNormalSpeed: send((ctx) => ({
         type: "CHANGE_SPEED",
-        intervalMS: ctx.config.speedPercentage.normal * ctx.config.baseSpeed,
+        intervalMS: ctx.level.speedPercentage.normal * ctx.config.baseSpeed,
       })),
     },
     guards: {

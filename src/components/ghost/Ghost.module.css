@@ -4,7 +4,7 @@
 
 .shapeOne,
 .shapeTwo {
-  animation-duration: 170ms;
+  animation-duration: 130ms;
   animation-timing-function: linear;
   animation-direction: alternate;
   animation-iteration-count: infinite;

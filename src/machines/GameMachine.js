@@ -147,13 +147,18 @@ const GameMachine = createMachine(
       revivedGhosts: [],
       maze: maze1,
       waitingForResponse: [],
-      gameConfig: {
+      levelConfig: {
         frightenedModeStartDuration: 5,
         frightenedModeEndingDuration: 5,
         pelletsFirstFruit: 12,
         pelletsSecondFruit: 50,
         pelletsRemainingElroy: 230,
         pelletsRemainingElroySpeedup: 10,
+        pacman: {
+          normalSpeedPercentage: 0.8,
+          frightenedSpeedPercentage: 0.9,
+        },
+        ghosts: {},
       },
       pelletCounters: {
         personal: {
@@ -185,6 +190,13 @@ const GameMachine = createMachine(
                     colOffset: 7,
                   },
                   direction: characterStartDirections.pacman,
+                  levelConfig: {
+                    speedPercentage: {
+                      normal: ctx.levelConfig.pacman.normalSpeedPercentage,
+                      frightened:
+                        ctx.levelConfig.pacman.frightenedSpeedPercentage,
+                    },
+                  },
                 }),
                 "pacman"
               ),
@@ -1287,17 +1299,17 @@ const GameMachine = createMachine(
       },
       releaseElroy: (ctx) =>
         ctx.maze.pelletsRemaining - ctx.pelletsEaten ===
-        ctx.gameConfig.pelletsRemainingElroy,
+        ctx.levelConfig.pelletsRemainingElroy,
       elroySecondSpeedup: (ctx) =>
         ctx.maze.pelletsRemaining - ctx.pelletsEaten ===
-        ctx.gameConfig.pelletsRemainingElroySpeedup,
+        ctx.levelConfig.pelletsRemainingElroySpeedup,
       eatenAllPellets: (ctx) =>
         ctx.maze.pelletsRemaining - ctx.pelletsEaten === 0,
       shouldDropFirstFruit: (ctx) => {
-        return ctx.pelletsEaten === ctx.gameConfig.pelletsFirstFruit - 1;
+        return ctx.pelletsEaten === ctx.levelConfig.pelletsFirstFruit - 1;
       },
       shouldDropSecondFruit: (ctx) =>
-        ctx.pelletsEaten === ctx.gameConfig.pelletsSecondFruit - 1,
+        ctx.pelletsEaten === ctx.levelConfig.pelletsSecondFruit - 1,
       pinkyLeavePersonal: (ctx) => ctx.pelletCounters.personal.pinky === 0,
       inkyLeavePersonal: (ctx) => ctx.pelletCounters.personal.inky === 30,
       clydeLeavePersonal: (ctx) => ctx.pelletCounters.personal.clyde === 60,

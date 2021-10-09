@@ -9,7 +9,7 @@ const WallExternalStraight = (props) => {
         position.y
       }), rotate(${rotation}, ${tileSize / 2}, ${tileSize / 2})`}
     >
-      <rect width="8" height="8" stroke="white" strokeWidth="1" />
+      {/* <rect width="8" height="8" stroke="white" strokeWidth="1" /> */}
       <path d="M 0,0 H 8 M 0,4 H 8" fill="transparent" stroke={color} />
     </g>
   );
