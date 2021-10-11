@@ -175,7 +175,7 @@ const MovementMachine = createMachine(
       direction: "left",
       nextDirection: "left",
       requestedDirection: undefined,
-      config: {},
+      initialSpeed: undefined,
     },
     on: {
       REQUEST_CHANGE_DIRECTION: {
@@ -190,6 +190,9 @@ const MovementMachine = createMachine(
       REMOVE_SPECIAL_SPEED: {
         actions: [forwardTo("speed")],
       },
+      CHANGE_SPEED: {
+        actions: [forwardTo("speed")],
+      },
       SPECIAL_SPEED: {
         actions: [forwardTo("speed")],
       },
@@ -199,7 +202,6 @@ const MovementMachine = createMachine(
       OVERRIDE_SPEED: {
         actions: [forwardTo("speed")],
       },
-      CHANGE_DIRECTION: {},
       SKIP_FRAMES: {
         actions: [forwardTo("speed")],
       },
@@ -214,8 +216,7 @@ const MovementMachine = createMachine(
       src: PacmanSpeedMachine,
       id: "speed",
       data: {
-        currentBaseInterval: (ctx, event) =>
-          1000 / (ctx.config.speedPercentage.normal * ctx.config.baseSpeed),
+        currentBaseInterval: (ctx, event) => ctx.initialSpeed,
         callbackEventName: "TICK",
       },
     },
@@ -568,10 +569,6 @@ const PacmanMachine = createMachine(
       framesToSkip: 0,
       config: {
         baseSpeed: 80,
-        speedPercentage: {
-          frightened: 0.9,
-          normal: 0.8,
-        },
       },
     },
     type: "parallel",
@@ -598,7 +595,10 @@ const PacmanMachine = createMachine(
               data: {
                 position: (ctx, event) => ctx.position,
                 direction: (ctx, event) => ctx.direction,
-                config: (ctx, event) => ctx.config,
+                initialSpeed: (ctx, event) =>
+                  1000 /
+                  (ctx.levelConfig.speedPercentage.normal *
+                    ctx.config.baseSpeed),
                 maze: (ctx, event) => ctx.maze,
                 nextDirection: (ctx, event) => ctx.nextDirection,
               },
@@ -636,22 +636,29 @@ const PacmanMachine = createMachine(
                 actions: [send("RESUME", { to: "movement" })],
               },
             },
-            // states: {
-            //   normal: {
-            //     on: {
-            //       FRIGHTENED: {
-            //         target: 'frightened',
-            //         actions: ['changeToFrightSpeed']
-            //       }
-            //     }
-            //   },
-            //   frightened: {
-            //     SCATTER: {
-            //       target: 'normal',
-
-            //     }
-            //   }
-            // }
+            initial: "normal",
+            states: {
+              normal: {
+                on: {
+                  FRIGHTENED: {
+                    target: "frightened",
+                    actions: ["changeToFrightSpeed"],
+                  },
+                },
+              },
+              frightened: {
+                on: {
+                  SCATTER: {
+                    target: "normal",
+                    actions: ["changeToNormalSpeed"],
+                  },
+                  CHASE: {
+                    target: "normal",
+                    actions: ["changeToNormalSpeed"],
+                  },
+                },
+              },
+            },
           },
           dead: {
             on: {
@@ -782,14 +789,24 @@ const PacmanMachine = createMachine(
       setPosition: assign({
         position: (ctx, event) => event.position,
       }),
-      changeToFrightSpeed: send((ctx) => ({
-        type: "CHANGE_SPEED",
-        intervalMS: ctx.level.speedPercentage.frightened * ctx.config.baseSpeed,
-      })),
-      changeToNormalSpeed: send((ctx) => ({
-        type: "CHANGE_SPEED",
-        intervalMS: ctx.level.speedPercentage.normal * ctx.config.baseSpeed,
-      })),
+      changeToFrightSpeed: send(
+        (ctx) => ({
+          type: "CHANGE_SPEED",
+          intervalMS:
+            1000 /
+            (ctx.levelConfig.speedPercentage.frightened * ctx.config.baseSpeed),
+        }),
+        { to: "movement" }
+      ),
+      changeToNormalSpeed: send(
+        (ctx) => ({
+          type: "CHANGE_SPEED",
+          intervalMS:
+            1000 /
+            (ctx.levelConfig.speedPercentage.normal * ctx.config.baseSpeed),
+        }),
+        { to: "movement" }
+      ),
     },
     guards: {
       get every() {
