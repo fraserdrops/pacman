@@ -1,5 +1,6 @@
-import { useActor } from "@xstate/react";
+import { useActor, useSelector } from "@xstate/react";
 import React from "react";
+import { interpret } from "xstate";
 import styles from "./Ghost.module.css";
 
 const makeSquiggle = (
@@ -111,9 +112,16 @@ const mapDirectionToEyePosition = {
     },
   },
 };
+
+const selectGhost = (state) => state.children.ghost;
+
 const Ghost = React.memo((props) => {
   const { tileSize, actorRef, color } = props;
-  const [state, send] = useActor(actorRef);
+  const ghostWrapper = interpret(actorRef);
+  const ghost = useSelector(ghostWrapper, selectGhost, (a, b) => a === b);
+  console.log("GHOST", ghostWrapper, ghost);
+  const [state, send] = useActor(ghost);
+
   const { position, direction } = state.context;
   if (!position) {
     return null;

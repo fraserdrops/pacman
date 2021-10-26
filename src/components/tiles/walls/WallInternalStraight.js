@@ -1,7 +1,7 @@
 import React from "react";
 
 const WallInternalStraight = (props) => {
-  const { rotation, tileSize, position, color } = props;
+  const { rotation, tileSize, position, className } = props;
 
   return (
     <g
@@ -9,54 +9,54 @@ const WallInternalStraight = (props) => {
         position.y
       }), rotate(${rotation}, ${tileSize / 2}, ${tileSize / 2})`}
     >
-      <path d="M 0,4 H 8" fill="transparent" stroke={color} />
+      <path d="M 0,4 H 8" fill="transparent" className={className} />
     </g>
   );
 };
 
 export const WallInternalStraightTop = (props) => {
-  const { tileSize, color, position } = props;
+  const { tileSize, className, position } = props;
   return (
     <WallInternalStraight
       rotation={0}
       tileSize={tileSize}
-      color={color}
+      className={className}
       position={position}
     />
   );
 };
 
 export const WallInternalStraightRight = (props) => {
-  const { tileSize, color, position } = props;
+  const { tileSize, className, position } = props;
   return (
     <WallInternalStraight
       rotation={90}
       tileSize={tileSize}
-      color={color}
+      className={className}
       position={position}
     />
   );
 };
 
 export const WallInternalStraightBottom = (props) => {
-  const { tileSize, color, position } = props;
+  const { tileSize, className, position } = props;
   return (
     <WallInternalStraight
       rotation={180}
       tileSize={tileSize}
-      color={color}
+      className={className}
       position={position}
     />
   );
 };
 
 export const WallInternalStraightLeft = (props) => {
-  const { tileSize, color, position } = props;
+  const { tileSize, className, position } = props;
   return (
     <WallInternalStraight
       rotation={-90}
       tileSize={tileSize}
-      color={color}
+      className={className}
       position={position}
     />
   );

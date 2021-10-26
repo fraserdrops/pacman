@@ -1,0 +1,16 @@
+.gameCompleted {
+  animation-name: fadeOut;
+  animation-delay: 5s;
+  animation-duration: 2s;
+  color: white;
+  animation-fill-mode: forwards;
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}

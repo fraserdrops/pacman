@@ -204,7 +204,7 @@ const GhostMachine = createMachine(
               data: {
                 position: (ctx, event) => ctx.position,
                 nextDirection: (ctx, event) => ctx.nextDirection,
-                targetTile: (ctx, event) => ctx.ghostConfig.targetTile,
+                // targetTile: (ctx, event) => ctx.ghostConfig.targetTile,
                 maze: (ctx, event) => ctx.maze,
                 direction: (ctx, event) => ctx.direction,
                 initialSpeed: (ctx) =>
@@ -861,7 +861,7 @@ const GhostMachine = createMachine(
       setTargetTileExitLeft: send(
         (ctx) => ({
           type: "CHANGE_TARGET_TILE",
-          targetTile: ctx.ghostConfig.leftExitTile,
+          targetTile: ctx.gameConfig.leftExitTile,
           character: ctx.character,
         }),
         { to: "movement" }
@@ -869,7 +869,7 @@ const GhostMachine = createMachine(
       setTargetTileExitRight: send(
         (ctx) => ({
           type: "CHANGE_TARGET_TILE",
-          targetTile: ctx.ghostConfig.rightExitTile,
+          targetTile: ctx.gameConfig.rightExitTile,
           character: ctx.character,
         }),
         { to: "movement" }
@@ -877,7 +877,7 @@ const GhostMachine = createMachine(
       setTargetTileHouseLeftEntrance: send(
         (ctx) => ({
           type: "CHANGE_TARGET_TILE",
-          targetTile: ctx.ghostConfig.leftEntranceTile,
+          targetTile: ctx.gameConfig.leftEntranceTile,
           character: ctx.character,
         }),
         { to: "movement" }
@@ -885,7 +885,7 @@ const GhostMachine = createMachine(
       setTargetTileHouseRightEntrance: send(
         (ctx) => ({
           type: "CHANGE_TARGET_TILE",
-          targetTile: ctx.ghostConfig.rightEntranceTile,
+          targetTile: ctx.gameConfig.rightEntranceTile,
           character: ctx.character,
         }),
         { to: "movement" }

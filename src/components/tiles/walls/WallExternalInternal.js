@@ -1,7 +1,7 @@
 import React from "react";
 
 const WallExternalInternalRight = (props) => {
-  const { rotation, tileSize, position, color } = props;
+  const { rotation, tileSize, position, className } = props;
 
   return (
     <g
@@ -12,14 +12,14 @@ const WallExternalInternalRight = (props) => {
       <path
         d="M 0,0 H 8 M0, 4 a4,4 0 0 1 4,4"
         fill="transparent"
-        stroke={color}
+        className={className}
       />
     </g>
   );
 };
 
 const WallExternalInternalLeft = (props) => {
-  const { rotation, tileSize, position, color } = props;
+  const { rotation, tileSize, position, className } = props;
   return (
     <g
       transform={`translate(${position.x}, ${
@@ -29,103 +29,103 @@ const WallExternalInternalLeft = (props) => {
       <path
         d="M 0,0 H 8 M8, 4 a4,4 0 0 0 -4,4"
         fill="transparent"
-        stroke={color}
+        className={className}
       />
     </g>
   );
 };
 
 export const WallExternalInternalTR = (props) => {
-  const { tileSize, color, position } = props;
+  const { tileSize, className, position } = props;
   return (
     <WallExternalInternalRight
       rotation={0}
       tileSize={tileSize}
-      color={color}
+      className={className}
       position={position}
     />
   );
 };
 
 export const WallExternalInternalTL = (props) => {
-  const { tileSize, color, position } = props;
+  const { tileSize, className, position } = props;
   return (
     <WallExternalInternalLeft
       rotation={0}
       tileSize={tileSize}
-      color={color}
+      className={className}
       position={position}
     />
   );
 };
 
 export const WallExternalInternalLR = (props) => {
-  const { tileSize, color, position } = props;
+  const { tileSize, className, position } = props;
   return (
     <WallExternalInternalRight
       rotation={-90}
       tileSize={tileSize}
-      color={color}
+      className={className}
       position={position}
     />
   );
 };
 
 export const WallExternalInternalLL = (props) => {
-  const { tileSize, color, position } = props;
+  const { tileSize, className, position } = props;
   return (
     <WallExternalInternalLeft
       rotation={-90}
       tileSize={tileSize}
-      color={color}
+      className={className}
       position={position}
     />
   );
 };
 
 export const WallExternalInternalBR = (props) => {
-  const { tileSize, color, position } = props;
+  const { tileSize, className, position } = props;
   return (
     <WallExternalInternalRight
       rotation={180}
       tileSize={tileSize}
-      color={color}
+      className={className}
       position={position}
     />
   );
 };
 
 export const WallExternalInternalBL = (props) => {
-  const { tileSize, color, position } = props;
+  const { tileSize, className, position } = props;
   return (
     <WallExternalInternalLeft
       rotation={180}
       tileSize={tileSize}
-      color={color}
+      className={className}
       position={position}
     />
   );
 };
 
 export const WallExternalInternalRR = (props) => {
-  const { tileSize, color, position } = props;
+  const { tileSize, className, position } = props;
   return (
     <WallExternalInternalRight
       rotation={90}
       tileSize={tileSize}
-      color={color}
+      className={className}
       position={position}
     />
   );
 };
 
 export const WallExternalInternalRL = (props) => {
-  const { tileSize, color, position } = props;
+  const { tileSize, className, position } = props;
   return (
     <WallExternalInternalLeft
       rotation={90}
       tileSize={tileSize}
-      color={color}
+      className={className}
       position={position}
     />
   );

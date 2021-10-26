@@ -1,0 +1,38 @@
+.App {
+  text-align: center;
+  height: 100vh;
+  width: 100%;
+  background: black;
+}
+
+.playerUpText {
+  animation-duration: 560ms;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-name: flashing;
+}
+
+.pauseAnimation {
+  animation-play-state: paused;
+}
+
+@keyframes flashing {
+  0% {
+    opacity: 1;
+  }
+  49% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.levelFadeOut {
+  visibility: hidden;
+  opacity: 0;
+  transition: visibility 0s 1.8s, opacity 1.8s linear;
+}

@@ -1,7 +1,7 @@
 import React from "react";
 
 const WallExternalCorner = (props) => {
-  const { rotation, tileSize, position, color } = props;
+  const { rotation, tileSize, position, className } = props;
 
   return (
     <g
@@ -9,55 +9,55 @@ const WallExternalCorner = (props) => {
         position.y
       }), rotate(${rotation}, ${tileSize / 2}, ${tileSize / 2})`}
     >
-      <path d="M0, 0 a8,8 0 0 1 8,8" fill="transparent" stroke={color} />
-      <path d="M0, 4 a4,4 0 0 1 4,4" fill="transparent" stroke={color} />
+      <path d="M0, 0 a8,8 0 0 1 8,8" fill="transparent" className={className} />
+      <path d="M0, 4 a4,4 0 0 1 4,4" fill="transparent" className={className} />
     </g>
   );
 };
 
 export const WallExternalCornerTR = (props) => {
-  const { tileSize, color, position } = props;
+  const { tileSize, className, position } = props;
   return (
     <WallExternalCorner
       rotation={0}
       tileSize={tileSize}
-      color={color}
+      className={className}
       position={position}
     />
   );
 };
 
 export const WallExternalCornerTL = (props) => {
-  const { tileSize, color, position } = props;
+  const { tileSize, className, position } = props;
   return (
     <WallExternalCorner
       rotation={-90}
       tileSize={tileSize}
-      color={color}
+      className={className}
       position={position}
     />
   );
 };
 
 export const WallExternalCornerBR = (props) => {
-  const { tileSize, color, position } = props;
+  const { tileSize, className, position } = props;
   return (
     <WallExternalCorner
       rotation={90}
       tileSize={tileSize}
-      color={color}
+      className={className}
       position={position}
     />
   );
 };
 
 export const WallExternalCornerBL = (props) => {
-  const { tileSize, color, position } = props;
+  const { tileSize, className, position } = props;
   return (
     <WallExternalCorner
       rotation={180}
       tileSize={tileSize}
-      color={color}
+      className={className}
       position={position}
     />
   );

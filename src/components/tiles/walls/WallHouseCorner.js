@@ -1,7 +1,7 @@
 import React from "react";
 
 const WallHouseCorner = (props) => {
-  const { rotation, tileSize, position, color } = props;
+  const { rotation, tileSize, position, className } = props;
 
   return (
     <g
@@ -12,55 +12,55 @@ const WallHouseCorner = (props) => {
       <path
         d="M 4,4 H 9 M 4,4 V 9 M8,8, H9 "
         fill="transparent"
-        stroke={color}
+        className={className}
       />
     </g>
   );
 };
 
 export const WallHouseCornerTL = (props) => {
-  const { tileSize, color, position } = props;
+  const { tileSize, className, position } = props;
   return (
     <WallHouseCorner
       rotation={0}
       tileSize={tileSize}
-      color={color}
+      className={className}
       position={position}
     />
   );
 };
 
 export const WallHouseCornerTR = (props) => {
-  const { tileSize, color, position } = props;
+  const { tileSize, className, position } = props;
   return (
     <WallHouseCorner
       rotation={9090}
       tileSize={tileSize}
-      color={color}
+      className={className}
       position={position}
     />
   );
 };
 
 export const WallHouseCornerBR = (props) => {
-  const { tileSize, color, position } = props;
+  const { tileSize, className, position } = props;
   return (
     <WallHouseCorner
       rotation={180}
       tileSize={tileSize}
-      color={color}
+      className={className}
       position={position}
     />
   );
 };
 
 export const WallHouseCornerBL = (props) => {
-  const { tileSize, color, position } = props;
+  const { tileSize, className, position } = props;
   return (
     <WallHouseCorner
       rotation={-90}
       tileSize={tileSize}
-      color={color}
+      className={className}
       position={position}
     />
   );

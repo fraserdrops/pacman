@@ -11,6 +11,7 @@ const TickerMachine = createMachine({
     ticking: {
       invoke: {
         src: (ctx) => (callback) => {
+          console.log("TICKER", ctx.intervalMS);
           const interval = setInterval(() => {
             callback("TICK");
           }, ctx.intervalMS);

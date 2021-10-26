@@ -1,5 +1,6 @@
 import React from "react";
 import { getTileComponent } from "./tiles/getTileComponent";
+import styles from "./Maze.module.css";
 
 const getColorForType = (type) => {
   const mapColorToType = {
@@ -11,20 +12,30 @@ const getColorForType = (type) => {
 
   return mapColorToType[type];
 };
+
+const getClassForType = (type, flashing) => {
+  const mapColorToType = {
+    wall: flashing ? styles.wallFlashing : styles.walls,
+  };
+
+  return mapColorToType[type];
+};
 const Maze = React.memo((props) => {
-  const { maze, tileSize } = props;
+  const { maze, tileSize, flashing } = props;
   const tiles = [];
 
   maze.tiles.forEach((row, i) => {
     row.forEach((tile, j) => {
       const TileComponent = getTileComponent(tile.type, tile.display);
       const color = getColorForType(tile.type);
+
       tiles.push(
         <TileComponent
           key={`${i}, ${j}`}
           tileSize={tileSize}
           position={{ x: j * tileSize, y: i * tileSize }}
           color={color}
+          className={getClassForType(tile.type, flashing)}
         />
       );
     });

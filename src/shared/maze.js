@@ -78,7 +78,7 @@ export const getTileDisplay = (maze, position) => {
   return maze[position.row][position.col].display;
 };
 
-export const maze1Tiles = [
+export const createMazeTiles = () => [
   createRowFromHalf([...createNTiles(14, "empty")]),
   createRowFromHalf([...createNTiles(14, "empty")]),
   createRowFromHalf([...createNTiles(14, "empty")]),
@@ -1140,48 +1140,50 @@ export const maze1Tiles = [
   createRowFromHalf([...createNTiles(14, "empty")]),
 ];
 
-let maze1PelletsRemaining = 0;
-maze1Tiles.forEach((row, rowIndex) => {
-  row.forEach((tile, colIndex) => {
-    if (tile.type === "pellet") {
-      maze1PelletsRemaining++;
-    }
+export const createMaze = () => {
+  const mazeTiles = createMazeTiles();
+  let pelletsRemaining = 0;
+  mazeTiles.forEach((row, rowIndex) => {
+    row.forEach((tile, colIndex) => {
+      if (tile.type === "pellet") {
+        pelletsRemaining++;
+      }
+    });
   });
-});
-
-export const maze1 = {
-  tiles: maze1Tiles,
-  zones: {
-    redZones: [
-      {
-        start: { row: 14, col: 11 },
-        end: { row: 14, col: 15 },
+  return {
+    tiles: mazeTiles,
+    zones: {
+      redZones: [
+        {
+          start: { row: 14, col: 11 },
+          end: { row: 14, col: 15 },
+        },
+        {
+          start: { row: 26, col: 11 },
+          end: { row: 26, col: 15 },
+        },
+      ],
+      tunnels: [
+        {
+          start: { row: 17, col: 0 },
+          end: { row: 17, col: 5 },
+        },
+        {
+          start: { row: 17, col: 27 },
+          end: { row: 17, col: 22 },
+        },
+      ],
+      ghostHouse: {
+        start: { row: 16, col: 11 },
+        end: { row: 18, col: 16 },
       },
-      {
-        start: { row: 26, col: 11 },
-        end: { row: 26, col: 15 },
+      ghostHouseEntrance: {
+        start: { row: 15, col: 13 },
+        end: { row: 15, col: 14 },
       },
-    ],
-    tunnels: [
-      {
-        start: { row: 17, col: 0 },
-        end: { row: 17, col: 5 },
-      },
-      {
-        start: { row: 17, col: 27 },
-        end: { row: 17, col: 22 },
-      },
-    ],
-    ghostHouse: {
-      start: { row: 16, col: 11 },
-      end: { row: 18, col: 16 },
     },
-    ghostHouseEntrance: {
-      start: { row: 15, col: 13 },
-      end: { row: 15, col: 14 },
-    },
-  },
-  numCols: maze1Tiles[0].length,
-  numRows: maze1Tiles.length,
-  pelletsRemaining: maze1PelletsRemaining,
+    numCols: mazeTiles[0].length,
+    numRows: mazeTiles.length,
+    pelletsRemaining,
+  };
 };
