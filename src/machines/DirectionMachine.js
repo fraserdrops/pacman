@@ -129,7 +129,6 @@ function chooseNextDirection({
   useCurrentTile,
 }) {
   // the ghosts look one tile ahead and choose what direction they will take when they get to the next tile
-
   let nextDirection = "up";
   let nextPosition = getProjectedPosition(
     maze,

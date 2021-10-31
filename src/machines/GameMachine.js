@@ -11,8 +11,6 @@ const getLevelConfig = (levelNumber) => {
       frightenedModeEndingDuration: 5,
       pelletsFirstFruit: 12,
       pelletsSecondFruit: 50,
-      pelletsRemainingElroy: 230,
-      pelletsRemainingElroySpeedup: 10,
       pacman: {
         normalSpeedPercentage: 0.8,
         frightenedSpeedPercentage: 0.9,
@@ -21,6 +19,8 @@ const getLevelConfig = (levelNumber) => {
         tunnelSpeedPercentage: 0.4,
         normalSpeedPercentage: 0.75,
         frightenedSpeedPercentage: 0.5,
+        pelletsRemainingElroy: 230,
+        pelletsRemainingElroySpeedup: 220,
       },
     },
     2: {
@@ -28,8 +28,6 @@ const getLevelConfig = (levelNumber) => {
       frightenedModeEndingDuration: 5,
       pelletsFirstFruit: 12,
       pelletsSecondFruit: 50,
-      pelletsRemainingElroy: 230,
-      pelletsRemainingElroySpeedup: 10,
       pacman: {
         normalSpeedPercentage: 0.8,
         frightenedSpeedPercentage: 0.9,
@@ -38,6 +36,8 @@ const getLevelConfig = (levelNumber) => {
         tunnelSpeedPercentage: 0.4,
         normalSpeedPercentage: 1.75,
         frightenedSpeedPercentage: 0.5,
+        pelletsRemainingElroy: 230,
+        pelletsRemainingElroySpeedup: 10,
       },
     },
     3: {
@@ -45,11 +45,11 @@ const getLevelConfig = (levelNumber) => {
       frightenedModeEndingDuration: 5,
       pelletsFirstFruit: 12,
       pelletsSecondFruit: 50,
-      pelletsRemainingElroy: 230,
-      pelletsRemainingElroySpeedup: 10,
       pacman: {
         normalSpeedPercentage: 0.8,
         frightenedSpeedPercentage: 0.9,
+        pelletsRemainingElroy: 230,
+        pelletsRemainingElroySpeedup: 10,
       },
       ghosts: {
         tunnelSpeedPercentage: 0.4,

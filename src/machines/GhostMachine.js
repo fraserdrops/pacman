@@ -34,8 +34,6 @@ const GhostMachine = createMachine(
         row: 15,
         col: 15,
       },
-      scatterTargeting: undefined,
-      chaseTargeting: undefined,
       direction: "left",
       nextDirection: "left",
       speed: {},
@@ -68,7 +66,6 @@ const GhostMachine = createMachine(
           col: 1,
         },
       },
-      ghostBehaviour: undefined,
     },
 
     type: "parallel",
@@ -171,7 +168,6 @@ const GhostMachine = createMachine(
           },
           UPDATE_SCATTER_TARGETING: {
             actions: ["updateScatterTargetingModule"],
-            internal: false,
           },
         },
         states: {
@@ -192,7 +188,9 @@ const GhostMachine = createMachine(
           playing: {
             type: "parallel",
             on: {
-              UPDATE_POSITION: { actions: ["setPosition", "setDirection"] },
+              UPDATE_POSITION: {
+                actions: ["setPosition", "setDirection"],
+              },
               RESET_POSITION: {
                 target: "stopped",
                 actions: ["setPosition", "setDirection"],
@@ -239,10 +237,7 @@ const GhostMachine = createMachine(
                             {
                               cond: "onTargetTile",
                               target: "inside",
-                              actions: [
-                                "sendOnTargetTile",
-                                () => console.log("ON TARGET TILE"),
-                              ],
+                              actions: ["sendOnTargetTile"],
                             },
                           ],
                         },
@@ -439,19 +434,11 @@ const GhostMachine = createMachine(
                         entry: [
                           choose([
                             {
-                              actions: [
-                                "setTargetTileHouseRightEntrance",
-                                (ctx) =>
-                                  console.log("Right ENTRANCE", ctx.character),
-                              ],
+                              actions: ["setTargetTileHouseRightEntrance"],
                               cond: "chaseModeHasChanged",
                             },
                             {
-                              actions: [
-                                "setTargetTileHouseLeftEntrance",
-                                (ctx) =>
-                                  console.log("left ENTRANCE", ctx.character),
-                              ],
+                              actions: ["setTargetTileHouseLeftEntrance"],
                             },
                           ]),
                         ],
@@ -510,10 +497,6 @@ const GhostMachine = createMachine(
                   },
                   normal: {
                     entry: [(ctx) => console.log("NORMAL MODE", ctx.character)],
-                    invoke: {
-                      id: "targetingModule",
-                      src: (ctx) => ctx.scatterTargeting,
-                    },
                     on: {
                       DIED: {
                         target: "dead",
@@ -546,7 +529,6 @@ const GhostMachine = createMachine(
                           "setNormalSpeed",
                           "queueChaseMode",
                           "setChaseModeHasChanged",
-                          () => console.log("CHASE MODE"),
                         ],
                         on: {
                           SCATTER: {
@@ -580,14 +562,16 @@ const GhostMachine = createMachine(
                       scatter: {
                         invoke: {
                           id: "targetingModule",
-                          src: (ctx) => ctx.ghostConfig.scatterTargeting,
+                          src: (ctx) => {
+                            console.log(ctx.ghostConfig.scatterTargeting);
+                            return ctx.ghostConfig.scatterTargeting;
+                          },
                         },
                         entry: [
                           "setTargetTileScatterMode",
                           "setNormalSpeed",
                           "queueScatterMode",
                           "setChaseModeHasChanged",
-                          () => console.log("SCATTER MODE"),
                         ],
                         on: {
                           CHASE: {
@@ -610,12 +594,23 @@ const GhostMachine = createMachine(
                               "setNormalSpeed",
                             ],
                           },
-                          UPDATE_SCATTER_TARGETING: {
-                            actions: ["updateScatterTargetingModule"],
-                            internal: false,
-                          },
+
                           NEW_TARGET_TILE: {
                             actions: ["forwardNewTargetTile"],
+                          },
+                        },
+                        initial: "targetingActive",
+                        states: {
+                          targetingActive: {
+                            on: {
+                              UPDATE_SCATTER_TARGETING: {
+                                actions: [
+                                  "updateScatterTargetingModule",
+                                  () => console.log("UPDATE_SCATTER_TARGETING"),
+                                ],
+                                internal: false,
+                              },
+                            },
                           },
                         },
                       },
@@ -684,6 +679,7 @@ const GhostMachine = createMachine(
   },
   {
     actions: {
+      forwardToParent: sendParent((ctx, event) => event),
       queueScatterMode: assign({
         queuedGameMode: "scatter",
       }),
@@ -817,7 +813,10 @@ const GhostMachine = createMachine(
         });
       }),
       updateScatterTargetingModule: assign({
-        scatterTargeting: (ctx, event) => event.targetingModule,
+        ghostConfig: (ctx, event) => ({
+          ...ctx.ghostConfig,
+          scatterTargeting: event.targetingModule,
+        }),
       }),
       applyTunnelRestrictions: send(
         { type: "SPECIAL_SPEED", specialKey: "tunnel", specialMultiplier: 0.5 },

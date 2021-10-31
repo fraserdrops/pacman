@@ -21,6 +21,8 @@ import {
   PinkyChaseTargeting,
   PinkyScatterTargeting,
 } from "./PinkyScatterTargetingMachine";
+import BlinkyMachine from "./BlinkyMachine";
+import PinkyMachine from "./PinkyMachine";
 
 const { pure, choose, raise } = actions;
 const GHOST_HOUSE_MIDDLE_ROW = 17;
@@ -44,7 +46,8 @@ const createGameStateForCharacters = (ctx) => {
       direction: ctx.pacman.direction,
       position: ctx.pacman.position,
     },
-    pelletsRemaining: ctx.pelletsRemaining,
+
+    pelletsRemaining: ctx.maze.pelletsRemaining - ctx.pelletsEaten,
   };
 
   Object.keys(ctx.ghosts).forEach((ghostName) => {
@@ -151,6 +154,8 @@ const createGameConfigForGhost = (ghostLevelConfig) => {
       returning: 2,
       ghostHouse: 0.5,
     },
+    pelletsRemainingElroy: ghostLevelConfig.pelletsRemainingElroy,
+    pelletsRemainingElroySpeedup: ghostLevelConfig.pelletsRemainingElroySpeedup,
     leftExitTile,
     rightExitTile,
     leftEntranceTile,
@@ -187,15 +192,19 @@ const LevelMachine = createMachine(
       livesRemaining: undefined,
       levelConfig: undefined,
     },
-    initial: "initial",
+    initial: "first",
     states: {
+      first: {
+        entry: [send("NEXT")],
+        on: {
+          NEXT: {
+            target: "initial",
+          },
+        },
+      },
       initial: {
         entry: [
-          (ctx, event, meta) =>
-            console.log(
-              "META",
-              createGameConfigForGhost(ctx.levelConfig.ghosts)
-            ),
+          send("START_GAME"),
           assign({
             pacman: (ctx) => ({
               ref: spawn(
@@ -220,7 +229,7 @@ const LevelMachine = createMachine(
                 "pacman"
               ),
             }),
-            ghosts: (ctx) => ({
+            ghosts: (ctx, event, meta) => ({
               // inky: {
               //   ref: spawn(
               //     GhostMachine.withContext({
@@ -249,20 +258,13 @@ const LevelMachine = createMachine(
               // },
               pinky: {
                 ref: spawn(
-                  GhostMachine.withContext({
-                    ...GhostMachine.context,
+                  PinkyMachine.withContext({
+                    ...PinkyMachine.context,
                     maze: ctx.maze,
-                    character: "pinky",
-                    position: characterStartPositions.pinky,
-                    direction: characterStartDirections.pinky,
-                    ghostConfig: {
-                      scatterTargeting: PinkyScatterTargeting,
-                      chaseTargeting: PinkyChaseTargeting,
-                      homeReturnTile: ghostHomeReturnTiles.pinky,
-                    },
                     gameConfig: createGameConfigForGhost(
                       ctx.levelConfig.ghosts
                     ),
+                    parentId: meta.state._sessionid,
                   }),
                   "pinky"
                 ),
@@ -296,20 +298,13 @@ const LevelMachine = createMachine(
               // },
               blinky: {
                 ref: spawn(
-                  GhostMachine.withContext({
-                    ...GhostMachine.context,
+                  BlinkyMachine.withContext({
+                    ...BlinkyMachine.context,
                     maze: ctx.maze,
-                    character: "blinky",
-                    position: characterStartPositions.blinky,
-                    direction: characterStartDirections.blinky,
-                    ghostConfig: {
-                      scatterTargeting: BlinkyScatterTargeting,
-                      chaseTargeting: BlinkyChaseTargeting,
-                      homeReturnTile: ghostHomeReturnTiles.blinky,
-                    },
                     gameConfig: createGameConfigForGhost(
                       ctx.levelConfig.ghosts
                     ),
+                    parentId: meta.state._sessionid,
                   }),
                   "blinky"
                 ),
@@ -317,12 +312,20 @@ const LevelMachine = createMachine(
             }),
           }),
         ],
-        always: {
-          target: "inGame",
-        },
+        // always: {
+        //   target: "inGame",
+        // },
         on: {
           START_GAME: {
             target: "inGame",
+            actions: [
+              assign({
+                yoza: (ctx, event, meta) => {
+                  console.log("START GAME META", meta);
+                  return "yoza";
+                },
+              }),
+            ],
           },
         },
       },
@@ -690,12 +693,7 @@ const LevelMachine = createMachine(
                           actions: ["updatePosition", "clearWaitingFor"],
                         },
                         {
-                          actions: [
-                            "removeFromWaitlist",
-                            "updatePosition",
-                            (ctx, event, meta) =>
-                              console.log("EVENT MATE", event, meta),
-                          ],
+                          actions: ["removeFromWaitlist", "updatePosition"],
                         },
                       ],
                     },
@@ -796,7 +794,7 @@ const LevelMachine = createMachine(
                   src: () => (callback) => {
                     const interval = setInterval(() => {
                       callback("TICK");
-                    }, 1000 / 60);
+                    }, 1000 / 10);
 
                     return () => {
                       clearInterval(interval);
@@ -812,8 +810,9 @@ const LevelMachine = createMachine(
                     ...IntervalMachine.context,
                     intervals: [
                       { eventType: "CHASE", seconds: 2 },
-                      // { eventType: "SCATTER", seconds: 5 },
-                      // { eventType: "CHASE", seconds: 5 },
+                      { eventType: "SCATTER", seconds: 5 },
+                      { eventType: "CHASE", seconds: 5 },
+                      { eventType: "SCATTER", seconds: 5 },
                     ],
                   }),
                 },
@@ -952,7 +951,7 @@ const LevelMachine = createMachine(
                   2000: {
                     target: "dying",
                     actions: [
-                      "tellPacmanAboutDying",
+                      "notifyCharactersPacmanDied",
                       "hideGhosts",
                       "removeFruit",
                       "decrementLivesRemaining",
@@ -1143,7 +1142,16 @@ const LevelMachine = createMachine(
           return updatedMaze;
         },
       }),
-      tellPacmanAboutDying: send({ type: "LOSE_LIFE" }, { to: "pacman" }),
+      notifyCharactersPacmanDied: pure((ctx) => {
+        return ["pacman", ...Object.keys(ctx.ghosts)].map((character) =>
+          send(
+            {
+              type: "LOSE_LIFE",
+            },
+            { to: character }
+          )
+        );
+      }),
       notifyPacmanPellet: send({ type: "EAT_PELLET" }, { to: "pacman" }),
       notifyPacmanPowerPellet: send(
         { type: "EAT_POWER_PELLET" },
@@ -1276,6 +1284,7 @@ const LevelMachine = createMachine(
         );
       }),
       notifyChaseMode: pure((ctx) => {
+        console.log("CHASE");
         return ["pacman", ...Object.keys(ctx.ghosts)].map((character) =>
           send(
             {
@@ -1286,6 +1295,7 @@ const LevelMachine = createMachine(
         );
       }),
       notifyScatterMode: pure((ctx) => {
+        console.log("SCATTER");
         return ["pacman", ...Object.keys(ctx.ghosts)].map((character) =>
           send(
             {

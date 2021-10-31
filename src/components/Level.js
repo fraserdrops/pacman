@@ -61,7 +61,9 @@ ${y}) rotate(${180}) scale (0.6 0.6)`}
 };
 
 const selectPacman = (state) => state.context.pacman;
-const selectGhosts = (state) => state.context.ghosts;
+const selectGhosts = (state) => {
+  return state.context.ghosts;
+};
 const selectPoints = (state) => state.context.totalPoints;
 const selectFruit = (state) => state.context.fruit;
 const selectMaze = (state) => state.context.maze;
@@ -95,7 +97,6 @@ function Level(props) {
     selectLivesRemaining,
     (a, b) => a === b
   );
-  console.log("GHOSTS", ghosts);
 
   return (
     <svg
@@ -125,6 +126,7 @@ function Level(props) {
       {fruit && <Fruit actorRef={fruit.ref} tileSize={tileSize} />}
       <Pacman actorRef={pacman.ref} tileSize={tileSize} />
       {Object.keys(ghosts).map((ghostId) => {
+        if (!ghostId) return null;
         return (
           <Ghost
             actorRef={ghosts[ghostId].ref}

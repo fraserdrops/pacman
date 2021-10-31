@@ -10,7 +10,7 @@ import ReturningHomeGhost from "./ReturningHomeGhost";
 const selectGhost = (state) => state.children.ghost;
 const selectPosition = (state) => state.context.position;
 const selectDirection = (state) => state.context.direction;
-const GhostWrapper = (props) => {
+const GhostWrapper = React.memo((props) => {
   const { tileSize, actorRef, color } = props;
   // const [state, send] = useActor(actorRef);
   // const ghostWrapper = use(actorRef);
@@ -20,7 +20,7 @@ const GhostWrapper = (props) => {
   return (
     <>{ghost && <Ghost tileSize={tileSize} actorRef={ghost} color={color} />}</>
   );
-};
+});
 const Ghost = React.memo((props) => {
   const { tileSize, actorRef, color } = props;
   // const position = useSelector(actorRef, selectPosition, (a, b) => a === b);
@@ -30,7 +30,6 @@ const Ghost = React.memo((props) => {
   // const state = {
   //   hasTag: () => true,
   // };
-
   if (!position) {
     return null;
   }
@@ -113,4 +112,4 @@ const Ghost = React.memo((props) => {
   );
 });
 
-export default Ghost;
+export default GhostWrapper;
