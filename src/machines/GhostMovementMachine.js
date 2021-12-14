@@ -13,15 +13,18 @@ import {
 } from "../util/characterUtil";
 import CharacterSpeedMachine from "./CharacterSpeedMachine";
 import DirectionMachine from "./DirectionMachine";
+import { tileConstants } from "../shared/maze";
 
 const { raise, respond, choose } = actions;
 
-const CENTER_COL_OFFSET = 3;
-const CENTER_ROW_OFFSET = 4;
-const MIN_COL_OFFSET = 0;
-const MAX_COL_OFFSET = 7;
-const MIN_ROW_OFFSET = 0;
-const MAX_ROW_OFFSET = 7;
+const {
+  CENTER_COL_OFFSET,
+  CENTER_ROW_OFFSET,
+  MIN_COL_OFFSET,
+  MAX_COL_OFFSET,
+  MIN_ROW_OFFSET,
+  MAX_ROW_OFFSET,
+} = tileConstants;
 
 const every = (...guards) => ({
   type: "every",
@@ -45,13 +48,7 @@ const GhostMovementMachine = createMachine(
         actions: ["updateNextDirection"],
       },
       CHANGE_TARGET_TILE: {
-        actions: [
-          "setTargetTile",
-          (ctx, event) => {
-            if (event.character === "pinky")
-              console.log("NEW TARGET TILE", event.targetTile);
-          },
-        ],
+        actions: ["setTargetTile"],
       },
       CHANGE_SPEED: {
         actions: [forwardTo("speed")],
@@ -308,7 +305,6 @@ const GhostMovementMachine = createMachine(
         };
       },
       atEdgeOfTile: (ctx) => {
-        // pacman can turn if he is at the center of the current tile
         const { direction, position } = ctx;
         const { colOffset, rowOffset } = position;
         if (direction === "up" || direction === "down") {
@@ -332,7 +328,7 @@ const GhostMovementMachine = createMachine(
         }
       },
       atStartOfTile: (ctx) => {
-        // pacman can turn if he is at the center of the current tile
+        // the start depends on what direction we are going
         const { direction, position } = ctx;
         const { colOffset, rowOffset } = position;
         if (direction === "up") {

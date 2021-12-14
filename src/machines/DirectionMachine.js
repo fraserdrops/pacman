@@ -4,7 +4,6 @@ import {
   getProjectedPosition,
   isPositionWithinZone,
 } from "../util/characterUtil";
-import { tileToString } from "../util/mazeUtil";
 
 let directions = ["up", "left", "down", "right"];
 

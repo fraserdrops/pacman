@@ -1,44 +1,23 @@
 import {
-  createMachine,
-  spawn,
-  assign,
-  send,
   actions,
+  assign,
+  createMachine,
   forwardTo,
+  send,
   sendParent,
+  spawn,
 } from "xstate";
-import PacmanMachine from "./PacmanMachine";
-import GhostMachine from "./GhostMachine";
 import { createMaze, getTileType, setTileType } from "../shared/maze";
-import IntervalMachine from "./IntervalMachine";
-import Fruit from "./FruitMachine";
-import {
-  BlinkyChaseTargeting,
-  BlinkyElroyScatterTargeting,
-  BlinkyScatterTargeting,
-} from "./BlinkyTargeting";
-import {
-  PinkyChaseTargeting,
-  PinkyScatterTargeting,
-} from "./PinkyScatterTargetingMachine";
 import BlinkyMachine from "./BlinkyMachine";
+import ClydeMachine from "./ClydeMachine";
+import Fruit from "./FruitMachine";
+import InkyMachine from "./InkyMachine";
+import IntervalMachine from "./IntervalMachine";
+import PacmanMachine from "./PacmanMachine";
 import PinkyMachine from "./PinkyMachine";
+import { locations } from "../shared/maze";
 
 const { pure, choose, raise } = actions;
-const GHOST_HOUSE_MIDDLE_ROW = 17;
-const GHOST_HOUSE_BOTTOM_ROW = 18;
-const GHOST_HOUSE_LEFT_COL = 12;
-const GHOST_HOUSE_MIDDLE_COL = 13;
-const GHOST_HOUSE_RIGHT_COL = 14;
-const CENTER_COL_OFFSET = 3;
-const CENTER_ROW_OFFSET = 4;
-const MIN_COL_OFFSET = 0;
-const MAX_COL_OFFSET = 7;
-const MIN_ROW_OFFSET = 0;
-const MAX_ROW_OFFSET = 7;
-
-const FRUIT_DROP_ROW = 20;
-const FRUIT_DROP_COL = 13;
 
 const createGameStateForCharacters = (ctx) => {
   const gameState = {
@@ -57,78 +36,6 @@ const createGameStateForCharacters = (ctx) => {
     };
   });
   return gameState;
-};
-
-const characterStartPositions = {
-  pacman: {
-    row: 26,
-    col: 13,
-    rowOffset: 4,
-    colOffset: 7,
-  },
-  inky: {
-    row: GHOST_HOUSE_MIDDLE_ROW,
-    col: GHOST_HOUSE_LEFT_COL,
-    rowOffset: CENTER_ROW_OFFSET,
-    colOffset: CENTER_COL_OFFSET,
-  },
-  pinky: {
-    row: GHOST_HOUSE_MIDDLE_ROW,
-    col: GHOST_HOUSE_MIDDLE_COL,
-    rowOffset: CENTER_ROW_OFFSET,
-    colOffset: MAX_COL_OFFSET,
-  },
-  clyde: {
-    row: GHOST_HOUSE_MIDDLE_ROW,
-    col: GHOST_HOUSE_RIGHT_COL,
-    rowOffset: CENTER_ROW_OFFSET,
-    colOffset: CENTER_COL_OFFSET,
-  },
-  blinky: {
-    row: GHOST_HOUSE_MIDDLE_ROW - 3,
-    col: GHOST_HOUSE_MIDDLE_COL,
-    rowOffset: CENTER_ROW_OFFSET,
-    colOffset: CENTER_COL_OFFSET,
-  },
-};
-
-const ghostHomeReturnTiles = {
-  inky: {
-    row: GHOST_HOUSE_BOTTOM_ROW,
-    col: GHOST_HOUSE_LEFT_COL,
-  },
-  pinky: {
-    row: GHOST_HOUSE_BOTTOM_ROW,
-    col: GHOST_HOUSE_MIDDLE_COL,
-  },
-  blinky: {
-    row: GHOST_HOUSE_BOTTOM_ROW,
-    col: GHOST_HOUSE_MIDDLE_COL,
-  },
-  clyde: {
-    row: GHOST_HOUSE_BOTTOM_ROW,
-    col: GHOST_HOUSE_RIGHT_COL,
-  },
-};
-
-const leftExitTile = { row: 14, col: 12 };
-const rightExitTile = { row: 14, col: 16 };
-
-const leftEntranceTile = {
-  col: GHOST_HOUSE_MIDDLE_COL,
-  row: GHOST_HOUSE_MIDDLE_ROW - 2,
-};
-const rightEntranceTile = {
-  col: GHOST_HOUSE_MIDDLE_COL + 1,
-  row: GHOST_HOUSE_MIDDLE_ROW - 2,
-};
-
-const characterStartDirections = {
-  pacman: "left",
-  inky: "up",
-  pinky: "down",
-  clyde: "up",
-  blinky: "left",
 };
 
 const getPoints = (event) => {
@@ -153,13 +60,15 @@ const createGameConfigForGhost = (ghostLevelConfig) => {
       frightened: ghostLevelConfig.frightenedSpeedPercentage,
       returning: 2,
       ghostHouse: 0.5,
+      elroyOne: ghostLevelConfig.elroyOneSpeedPercentage,
+      elroyTwo: ghostLevelConfig.elroyTwoSpeedPercentage,
     },
     pelletsRemainingElroy: ghostLevelConfig.pelletsRemainingElroy,
     pelletsRemainingElroySpeedup: ghostLevelConfig.pelletsRemainingElroySpeedup,
-    leftExitTile,
-    rightExitTile,
-    leftEntranceTile,
-    rightEntranceTile,
+    leftExitTile: locations.LEFT_EXIT_TILE,
+    rightExitTile: locations.RIGHT_EXIT_TILE,
+    leftEntranceTile: locations.LEFT_ENTRANCE_TILE,
+    rightEntranceTile: locations.RIGHT_ENTRANCE_TILE,
   };
 };
 
@@ -217,7 +126,7 @@ const LevelMachine = createMachine(
                     rowOffset: 4,
                     colOffset: 7,
                   },
-                  direction: characterStartDirections.pacman,
+                  direction: "left",
                   levelConfig: {
                     speedPercentage: {
                       normal: ctx.levelConfig.pacman.normalSpeedPercentage,
@@ -230,32 +139,19 @@ const LevelMachine = createMachine(
               ),
             }),
             ghosts: (ctx, event, meta) => ({
-              // inky: {
-              //   ref: spawn(
-              //     GhostMachine.withContext({
-              //       ...GhostMachine.context,
-              //       maze: ctx.maze,
-              //       character: "inky",
-              //       position: characterStartPositions.inky,
-              //       direction: characterStartDirections.inky,
-              //       ghostConfig: {
-              //         scatterTargeting: BlinkyScatterTargeting,
-              //         chaseTargeting: BlinkyChaseTargeting,
-              //         homeTile: characterStartPositions.inky,
-              //         targetTile: { row: 1, col: 1 },
-              //         leftExitTile: {
-              //           row: GHOST_HOUSE_MIDDLE_ROW - 3,
-              //           col: GHOST_HOUSE_MIDDLE_COL - 1,
-              //         },
-              //         rightExitTile: {
-              //           row: GHOST_HOUSE_MIDDLE_ROW - 3,
-              //           col: GHOST_HOUSE_MIDDLE_COL + 1,
-              //         },
-              //       },
-              //     }),
-              //     "inky"
-              //   ),
-              // },
+              inky: {
+                ref: spawn(
+                  InkyMachine.withContext({
+                    ...InkyMachine.context,
+                    maze: ctx.maze,
+                    gameConfig: createGameConfigForGhost(
+                      ctx.levelConfig.ghosts
+                    ),
+                    parentId: meta.state._sessionid,
+                  }),
+                  "inky"
+                ),
+              },
               pinky: {
                 ref: spawn(
                   PinkyMachine.withContext({
@@ -269,33 +165,19 @@ const LevelMachine = createMachine(
                   "pinky"
                 ),
               },
-              // clyde: {
-              //   ref: spawn(
-              //     GhostMachine.withContext({
-              //       ...GhostMachine.context,
-              //       maze: ctx.maze,
-              //       character: "clyde",
-              //       position: characterStartPositions.clyde,
-              //       direction: characterStartDirections.clyde,
-              //       ghostConfig: {
-              //         scatterTargeting: BlinkyScatterTargeting,
-              //         chaseTargeting: BlinkyChaseTargeting,
-              //         homeTile: characterStartPositions.clyde,
-              //         targetTile: { row: 1, col: 1 },
-
-              //         leftExitTile: {
-              //           row: GHOST_HOUSE_MIDDLE_ROW - 3,
-              //           col: GHOST_HOUSE_MIDDLE_COL - 1,
-              //         },
-              //         rightExitTile: {
-              //           row: GHOST_HOUSE_MIDDLE_ROW - 3,
-              //           col: GHOST_HOUSE_MIDDLE_COL + 1,
-              //         },
-              //       },
-              //     }),
-              //     "clyde"
-              //   ),
-              // },
+              clyde: {
+                ref: spawn(
+                  ClydeMachine.withContext({
+                    ...ClydeMachine.context,
+                    maze: ctx.maze,
+                    gameConfig: createGameConfigForGhost(
+                      ctx.levelConfig.ghosts
+                    ),
+                    parentId: meta.state._sessionid,
+                  }),
+                  "clyde"
+                ),
+              },
               blinky: {
                 ref: spawn(
                   BlinkyMachine.withContext({
@@ -349,10 +231,7 @@ const LevelMachine = createMachine(
             type: "parallel",
             on: {
               LEFT_ARROW: {
-                actions: [
-                  send({ type: "LEFT" }, { to: "pacman" }),
-                  () => console.log("LEFT ARROW"),
-                ],
+                actions: [send({ type: "LEFT" }, { to: "pacman" })],
               },
               RIGHT_ARROW: {
                 actions: [send({ type: "RIGHT" }, { to: "pacman" })],
@@ -372,37 +251,13 @@ const LevelMachine = createMachine(
               },
               LOSE_LIFE: {
                 target: "lostLife",
+                actions: [() => console.log("LOST LIFE")],
               },
               GHOST_HAS_RETURNED_HOME: {
                 actions: ["removeGhostFromDeadGhosts", "addRevivedGhost"],
               },
             },
             states: {
-              pelletWatcher: {
-                on: {
-                  PELLET_EATEN: [
-                    {
-                      cond: "releaseElroy",
-                      actions: [
-                        send(
-                          {
-                            type: "UPDATE_NORMAL_SPEED",
-                            speedPercentage: 1.95,
-                          },
-                          { to: "blinky" }
-                        ),
-                        send(
-                          {
-                            type: "UPDATE_SCATTER_TARGETING",
-                            targetingModule: BlinkyElroyScatterTargeting,
-                          },
-                          { to: "blinky" }
-                        ),
-                      ],
-                    },
-                  ],
-                },
-              },
               ghostExit: {
                 type: "parallel",
                 states: {
@@ -450,41 +305,41 @@ const LevelMachine = createMachine(
                       },
                       inkyActive: {
                         on: {
-                          // UPDATE_PERSONAL_COUNTER: [
-                          //   {
-                          //     cond: "inkyLeavePersonal",
-                          //     target: "clydeActive",
-                          //     actions: [
-                          //       {
-                          //         type: "incrementPersonalCounter",
-                          //         ghost: "inky",
-                          //       },
-                          //       "inkyLeaveHome",
-                          //     ],
-                          //   },
-                          //   {
-                          //     actions: [
-                          //       {
-                          //         type: "incrementPersonalCounter",
-                          //         ghost: "inky",
-                          //       },
-                          //     ],
-                          //   },
-                          // ],
+                          UPDATE_PERSONAL_COUNTER: [
+                            {
+                              cond: "inkyLeavePersonal",
+                              target: "clydeActive",
+                              actions: [
+                                {
+                                  type: "incrementPersonalCounter",
+                                  ghost: "inky",
+                                },
+                                "inkyLeaveHome",
+                              ],
+                            },
+                            {
+                              actions: [
+                                {
+                                  type: "incrementPersonalCounter",
+                                  ghost: "inky",
+                                },
+                              ],
+                            },
+                          ],
                           GLOBAL_COUNTER_INCREMENTED: [
                             {
                               cond: "inkyLeaveGlobal",
-                              // target: "clydeActive",
+                              target: "clydeActive",
                             },
                             {
                               cond: "shouldResetGlobalCounter",
                               actions: [send("RESET_GLOBAL_COUNTER")],
                             },
                           ],
-                          // NEXT_GHOST_LEAVE_HOME: {
-                          //   target: "clydeActive",
-                          //   actions: ["inkyLeaveHome"],
-                          // },
+                          NEXT_GHOST_LEAVE_HOME: {
+                            target: "clydeActive",
+                            actions: ["inkyLeaveHome"],
+                          },
                         },
                       },
                       clydeActive: {
@@ -794,7 +649,7 @@ const LevelMachine = createMachine(
                   src: () => (callback) => {
                     const interval = setInterval(() => {
                       callback("TICK");
-                    }, 1000 / 10);
+                    }, 1000 / 30);
 
                     return () => {
                       clearInterval(interval);
@@ -810,9 +665,11 @@ const LevelMachine = createMachine(
                     ...IntervalMachine.context,
                     intervals: [
                       { eventType: "CHASE", seconds: 2 },
-                      { eventType: "SCATTER", seconds: 5 },
-                      { eventType: "CHASE", seconds: 5 },
-                      { eventType: "SCATTER", seconds: 5 },
+                      { eventType: "SCATTER", seconds: 2 },
+                      { eventType: "CHASE", seconds: 2 },
+                      { eventType: "SCATTER", seconds: 2 },
+                      { eventType: "CHASE", seconds: 2 },
+                      { eventType: "SCATTER", seconds: 2 },
                     ],
                   }),
                 },
@@ -829,7 +686,11 @@ const LevelMachine = createMachine(
                         ],
                       },
                       GHOST_COLLISION: {
-                        actions: [send("LOSE_LIFE"), "pauseCharacters"],
+                        actions: [
+                          () => console.log("GHOST COLLISION, LOST LIFE"),
+                          send("LOSE_LIFE"),
+                          "pauseCharacters",
+                        ],
                       },
                     },
                     states: {
@@ -943,6 +804,7 @@ const LevelMachine = createMachine(
             },
           },
           lostLife: {
+            entry: [() => console.log("ENTER lostLife")],
             id: "lostLife",
             initial: "stopped",
             states: {
@@ -960,6 +822,7 @@ const LevelMachine = createMachine(
                 },
               },
               dying: {
+                entry: [() => console.log("ENTER dying")],
                 after: {
                   3000: {
                     target: "finishedDying",
@@ -1035,12 +898,12 @@ const LevelMachine = createMachine(
         fruit: () => ({
           type: "orange",
           value: getPoints("fruit"),
-          position: { row: FRUIT_DROP_ROW, col: FRUIT_DROP_COL },
+          position: locations.FRUIT_TILE,
           ref: spawn(
             Fruit.withContext({
               type: "orange",
               value: getPoints("fruit"),
-              position: { row: FRUIT_DROP_ROW, col: FRUIT_DROP_COL },
+              position: locations.FRUIT_TILE,
             }),
             "fruit"
           ),
@@ -1125,11 +988,6 @@ const LevelMachine = createMachine(
       }),
       removeGhostFromDeadGhosts: assign({
         deadGhosts: (ctx, event) => {
-          console.log(
-            "dead ghosts",
-            event,
-            ctx.deadGhosts.filter((ghost) => ghost !== event.ghost)
-          );
           return ctx.deadGhosts.filter((ghost) => ghost !== event.ghost);
         },
       }),
@@ -1198,6 +1056,7 @@ const LevelMachine = createMachine(
         );
       }),
       pauseCharacters: pure((ctx) => {
+        console.log("PAUSE CHARACTERS", ["pacman", ...Object.keys(ctx.ghosts)]);
         return ["pacman", ...Object.keys(ctx.ghosts)].map((character) =>
           send(
             {
@@ -1323,8 +1182,6 @@ const LevelMachine = createMachine(
           send(
             {
               type: "RESET_POSITION",
-              position: characterStartPositions[character],
-              direction: characterStartDirections[character],
             },
             { to: character }
           )
@@ -1365,12 +1222,6 @@ const LevelMachine = createMachine(
         const tileType = getTileType(maze.tiles, position);
         return tileType === "powerPellet";
       },
-      releaseElroy: (ctx) =>
-        ctx.maze.pelletsRemaining - ctx.pelletsEaten ===
-        ctx.levelConfig.pelletsRemainingElroy,
-      elroySecondSpeedup: (ctx) =>
-        ctx.maze.pelletsRemaining - ctx.pelletsEaten ===
-        ctx.levelConfig.pelletsRemainingElroySpeedup,
       eatenAllPellets: (ctx) =>
         ctx.maze.pelletsRemaining - ctx.pelletsEaten === 0,
       // ctx.pelletsEaten > 5,

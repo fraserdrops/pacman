@@ -7,29 +7,34 @@ import HiddenGhost from "./HiddenGhost";
 import NormalGhost from "./NormalGhost";
 import ReturningHomeGhost from "./ReturningHomeGhost";
 
+const ghostColors = {
+  inky: "cyan",
+  pinky: "pink",
+  blinky: "red",
+  clyde: "orange",
+};
+
 const selectGhost = (state) => state.children.ghost;
 const selectPosition = (state) => state.context.position;
 const selectDirection = (state) => state.context.direction;
 const GhostWrapper = React.memo((props) => {
-  const { tileSize, actorRef, color } = props;
+  const { tileSize, actorRef } = props;
   // const [state, send] = useActor(actorRef);
   // const ghostWrapper = use(actorRef);
   // console.log("ghostWrapper", ghostWrapper);
 
   const ghost = useSelector(actorRef, selectGhost, (a, b) => a === b);
-  return (
-    <>{ghost && <Ghost tileSize={tileSize} actorRef={ghost} color={color} />}</>
-  );
+  const ghostRef = ghost || actorRef;
+  return <>{ghostRef && <Ghost tileSize={tileSize} actorRef={ghostRef} />}</>;
 });
 const Ghost = React.memo((props) => {
-  const { tileSize, actorRef, color } = props;
+  const { tileSize, actorRef } = props;
+
   // const position = useSelector(actorRef, selectPosition, (a, b) => a === b);
   // const direction = useSelector(actorRef, selectDirection, (a, b) => a === b);
   const [state, send] = useActor(actorRef);
-  const { position, direction } = state.context;
-  // const state = {
-  //   hasTag: () => true,
-  // };
+  const { position, direction, character } = state.context;
+  const color = ghostColors[character];
   if (!position) {
     return null;
   }
@@ -94,20 +99,6 @@ const Ghost = React.memo((props) => {
           />
         )}
       </g>
-      {/* <g
-        transform={`translate(${position.col * tileSize}
-    ${position.row * tileSize})`}
-      >
-        <rect width="8" height="8" stroke="white" strokeWidth="1" fill="none" />
-      </g>
-      <g
-        transform={`translate(${
-          position.col * tileSize + position.colOffset - 0.5
-        }
-    ${position.row * tileSize + position.rowOffset - 0.5})`}
-      >
-        <circle r="1" cx="0" cy="0" fill="yellow" />
-      </g> */}
     </>
   );
 });

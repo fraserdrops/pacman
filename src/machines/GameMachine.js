@@ -21,6 +21,8 @@ const getLevelConfig = (levelNumber) => {
         frightenedSpeedPercentage: 0.5,
         pelletsRemainingElroy: 230,
         pelletsRemainingElroySpeedup: 220,
+        elroyOneSpeedPercentage: 0.8,
+        elroyTwoSpeedPercentage: 0.85,
       },
     },
     2: {
@@ -76,6 +78,11 @@ const GameMachine = createMachine(
       readyToPlay: {
         tags: ["readyToPlay"],
         on: { PLAY_GAME: { target: "initLevel" } },
+        after: {
+          100: {
+            target: "initLevel",
+          },
+        },
       },
       initLevel: {
         always: {

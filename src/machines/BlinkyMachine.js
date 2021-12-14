@@ -1,19 +1,22 @@
-import { actions, assign, createMachine, forwardTo, send } from "xstate";
-import { getTileType } from "../shared/maze";
+import { createMachine, forwardTo, send } from "xstate";
+import { ghostHouseConstants, tileConstants } from "../shared/maze";
 import GhostMachine from "./GhostMachine";
-const { raise, respond, choose } = actions;
 
-const GHOST_HOUSE_MIDDLE_ROW = 17;
-const GHOST_HOUSE_BOTTOM_ROW = 18;
-const GHOST_HOUSE_LEFT_COL = 12;
-const GHOST_HOUSE_MIDDLE_COL = 13;
-const GHOST_HOUSE_RIGHT_COL = 14;
-const CENTER_COL_OFFSET = 3;
-const CENTER_ROW_OFFSET = 4;
-const MIN_COL_OFFSET = 0;
-const MAX_COL_OFFSET = 7;
-const MIN_ROW_OFFSET = 0;
-const MAX_ROW_OFFSET = 7;
+const { CENTER_ROW_OFFSET, CENTER_COL_OFFSET } = tileConstants;
+const {
+  GHOST_HOUSE_MIDDLE_ROW,
+  GHOST_HOUSE_MIDDLE_COL,
+  GHOST_HOUSE_BOTTOM_ROW,
+} = ghostHouseConstants;
+
+const START_POSITION = {
+  row: GHOST_HOUSE_MIDDLE_ROW - 3,
+  col: GHOST_HOUSE_MIDDLE_COL,
+  rowOffset: CENTER_ROW_OFFSET,
+  colOffset: CENTER_COL_OFFSET,
+};
+
+const START_DIRECTION = "left";
 const BlinkyMachine = createMachine(
   {
     id: "BlinkyMachine",
@@ -25,20 +28,17 @@ const BlinkyMachine = createMachine(
         ...GhostMachine.context,
         ...ctx,
         character: "blinky",
-        position: {
-          row: GHOST_HOUSE_MIDDLE_ROW - 3,
-          col: GHOST_HOUSE_MIDDLE_COL,
-          rowOffset: CENTER_ROW_OFFSET,
-          colOffset: CENTER_COL_OFFSET,
-        },
-        direction: "left",
+        position: START_POSITION,
+        direction: START_DIRECTION,
         ghostConfig: {
-          scatterTargeting: BlinkyScatterTargeting, // actor submodule
-          chaseTargeting: BlinkyChaseTargeting, // actor submodule
+          scatterTargeting: BlinkyScatterTargeting,
+          chaseTargeting: BlinkyChaseTargeting,
           homeReturnTile: {
-            GHOST_HOUSE_BOTTOM_ROW,
+            row: GHOST_HOUSE_BOTTOM_ROW,
             col: GHOST_HOUSE_MIDDLE_COL,
           },
+          startPosition: START_POSITION,
+          startDirection: START_DIRECTION,
         },
       }),
     },
@@ -135,17 +135,17 @@ const BlinkyMachine = createMachine(
       forwardToGhost: forwardTo("ghost"),
       forwardToParent: forwardTo((ctx) => ctx.parentId),
       elroyLevelOneSpeedup: send(
-        {
+        (ctx) => ({
           type: "UPDATE_NORMAL_SPEED",
-          speedPercentage: 0.3,
-        },
+          speedPercentage: ctx.gameConfig.speedPercentage.elroyOne,
+        }),
         { to: "ghost" }
       ),
       elroyLevelTwoSpeedup: send(
-        {
+        (ctx) => ({
           type: "UPDATE_NORMAL_SPEED",
-          speedPercentage: 2,
-        },
+          speedPercentage: ctx.gameConfig.speedPercentage.elroyTwo,
+        }),
         { to: "ghost" }
       ),
       elroyTargeting: send(

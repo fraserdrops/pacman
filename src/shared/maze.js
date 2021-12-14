@@ -1187,3 +1187,44 @@ export const createMaze = () => {
     pelletsRemaining,
   };
 };
+
+export const ghostHouseConstants = {
+  GHOST_HOUSE_MIDDLE_ROW: 17,
+  GHOST_HOUSE_BOTTOM_ROW: 18,
+  GHOST_HOUSE_LEFT_COL: 11,
+  GHOST_HOUSE_MIDDLE_COL: 13,
+  GHOST_HOUSE_RIGHT_COL: 15,
+};
+
+export const tileConstants = {
+  TILE_SIZE: 8,
+  MIN_COL_OFFSET: 0,
+  MAX_COL_OFFSET: 7,
+  MIN_ROW_OFFSET: 0,
+  MAX_ROW_OFFSET: 7,
+  CENTER_COL_OFFSET: 3,
+  CENTER_ROW_OFFSET: 4, // 8 pixels doesn't have a true middle. This is how the game defined it
+};
+
+export const locations = {
+  FRUIT_TILE: {
+    row: 20,
+    col: 13,
+  },
+  LEFT_EXIT_TILE: {
+    row: 14,
+    col: 12,
+  },
+  RIGHT_EXIT_TILE: {
+    row: 14,
+    col: 16,
+  },
+  LEFT_ENTRANCE_TILE: {
+    col: ghostHouseConstants.GHOST_HOUSE_MIDDLE_COL,
+    row: ghostHouseConstants.GHOST_HOUSE_MIDDLE_ROW - 2,
+  },
+  RIGHT_ENTRANCE_TILE: {
+    col: ghostHouseConstants.GHOST_HOUSE_MIDDLE_COL + 1,
+    row: ghostHouseConstants.GHOST_HOUSE_MIDDLE_ROW - 2,
+  },
+};

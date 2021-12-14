@@ -41,7 +41,7 @@ function App() {
       {readyToPlay && (
         <button onClick={() => game.send("PLAY_GAME")}>Play</button>
       )}
-      {playingLevel && <Level levelActor={level} />}
+      {/* {playingLevel && <Level levelActor={level} />} */}
       {gameCompleted && <GameCompleted />}
     </div>
   );

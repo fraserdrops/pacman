@@ -153,12 +153,8 @@ const GhostMachine = createMachine(
           GAME_SYNC: {
             actions: ["respondWithUpdatedPosition", "updateGameState"],
           },
-          RESET_POSITION: {
-            target: ".playing",
-            actions: ["setPosition"],
-          },
           PAUSE: {
-            actions: ["pauseMovement"],
+            actions: ["pauseMovement", () => console.log("PAUSE GHOST")],
           },
           RESUME: {
             actions: ["resumeMovement"],
@@ -193,7 +189,7 @@ const GhostMachine = createMachine(
               },
               RESET_POSITION: {
                 target: "stopped",
-                actions: ["setPosition", "setDirection"],
+                actions: ["resetPosition"],
               },
             },
             invoke: {
@@ -538,9 +534,6 @@ const GhostMachine = createMachine(
                           FRIGHTENED: {
                             target: "frightened",
                           },
-                          TICK: {
-                            actions: ["updateTargetTileNormalMode"],
-                          },
                           GAME_SYNC: {
                             actions: [
                               "respondWithUpdatedPosition",
@@ -563,12 +556,11 @@ const GhostMachine = createMachine(
                         invoke: {
                           id: "targetingModule",
                           src: (ctx) => {
-                            console.log(ctx.ghostConfig.scatterTargeting);
                             return ctx.ghostConfig.scatterTargeting;
                           },
                         },
                         entry: [
-                          "setTargetTileScatterMode",
+                          "calculateTargetTile",
                           "setNormalSpeed",
                           "queueScatterMode",
                           "setChaseModeHasChanged",
@@ -604,10 +596,7 @@ const GhostMachine = createMachine(
                           targetingActive: {
                             on: {
                               UPDATE_SCATTER_TARGETING: {
-                                actions: [
-                                  "updateScatterTargetingModule",
-                                  () => console.log("UPDATE_SCATTER_TARGETING"),
-                                ],
+                                actions: ["updateScatterTargetingModule"],
                                 internal: false,
                               },
                             },
@@ -679,7 +668,6 @@ const GhostMachine = createMachine(
   },
   {
     actions: {
-      forwardToParent: sendParent((ctx, event) => event),
       queueScatterMode: assign({
         queuedGameMode: "scatter",
       }),
@@ -842,21 +830,6 @@ const GhostMachine = createMachine(
         }),
         { to: "movement" }
       ),
-      setTargetTileScatterMode: send(
-        (ctx) => ({
-          type: "CHANGE_TARGET_TILE",
-          targetTile: ctx.ghostConfig.scatterTargetTile,
-        }),
-        { to: "movement" }
-      ),
-      updateTargetTileNormalMode: send(
-        (ctx) => ({
-          type: "CHANGE_TARGET_TILE",
-          targetTile: ctx.ghostConfig.targetTile,
-          character: ctx.character,
-        }),
-        { to: "movement" }
-      ),
       setTargetTileExitLeft: send(
         (ctx) => ({
           type: "CHANGE_TARGET_TILE",
@@ -922,6 +895,10 @@ const GhostMachine = createMachine(
         }),
         { to: "movement" }
       ),
+      resetPosition: assign({
+        position: (ctx) => ctx.ghostConfig.startPosition,
+        direction: (ctx) => ctx.ghostConfig.startDirection,
+      }),
     },
     guards: {
       get every() {

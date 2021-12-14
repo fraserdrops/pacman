@@ -4,13 +4,7 @@ import { Fruit } from "./Fruit";
 import Ghost from "./ghost/Ghost";
 import Maze from "./Maze";
 import Pacman from "./Pacman";
-
-const ghostColors = {
-  inky: "cyan",
-  pinky: "pink",
-  blinky: "red",
-  clyde: "orange",
-};
+import React from "react";
 
 const tileSize = 8;
 
@@ -60,12 +54,12 @@ ${y}) rotate(${180}) scale (0.6 0.6)`}
   );
 };
 
-const selectPacman = (state) => state.context.pacman;
-const selectGhosts = (state) => {
-  return state.context.ghosts;
+const selectPacmanRef = (state) => state.context.pacman.ref;
+const selectGhostRefs = (state) => {
+  return Object.values(state.context.ghosts).map(({ ref }) => ref);
 };
 const selectPoints = (state) => state.context.totalPoints;
-const selectFruit = (state) => state.context.fruit;
+const selectFruitRef = (state) => state.context.fruit?.ref;
 const selectMaze = (state) => state.context.maze;
 const selectGetReady = (state) => state.hasTag("getReady");
 const selectGameOver = (state) => state.hasTag("gameOver");
@@ -73,13 +67,21 @@ const selectMazeFlashing = (state) => state.hasTag("mazeFlashing");
 const selectLevelFadeOut = (state) => state.hasTag("levelFadeOut");
 const selectLivesRemaining = (state) => state.context.livesRemaining;
 
-function Level(props) {
+const Level = React.memo(function Level(props) {
   const { levelActor } = props;
-  const pacman = useSelector(levelActor, selectPacman, (a, b) => a === b);
-  const ghosts = useSelector(levelActor, selectGhosts, (a, b) => a === b);
-  const maze = useSelector(levelActor, selectMaze, (a, b) => a === b);
-  const points = useSelector(levelActor, selectPoints, (a, b) => a === b);
-  const fruit = useSelector(levelActor, selectFruit, (a, b) => a === b);
+  const pacmanRef = useSelector(levelActor, selectPacmanRef, (a, b) => a === b);
+  const ghostRefs = useSelector(levelActor, selectGhostRefs, (a, b) => {
+    a.forEach((ghostRef, index) => {
+      if (ghostRef !== b[index]) {
+        return false;
+      }
+    });
+    return true;
+  });
+  console.log(ghostRefs);
+  // const maze = useSelector(levelActor, selectMaze, (a, b) => a === b);
+  // const points = useSelector(levelActor, selectPoints, (a, b) => a === b);
+  const fruitRef = useSelector(levelActor, selectFruitRef, (a, b) => a === b);
   const getReady = useSelector(levelActor, selectGetReady, (a, b) => a === b);
   const gameOver = useSelector(levelActor, selectGameOver, (a, b) => a === b);
   const levelFadeOut = useSelector(
@@ -98,12 +100,14 @@ function Level(props) {
     (a, b) => a === b
   );
 
+  console.log("RENDER");
+
   return (
     <svg
       width="800px"
       height="90vh"
       viewBox="0 0 300 300"
-      className={levelFadeOut ? styles.levelFadeOut : ""}
+      // className={levelFadeOut ? styles.levelFadeOut : ""}
       onKeyDown={(e) => {
         if (e.key === "ArrowUp") {
           levelActor.send("UP_ARROW");
@@ -122,18 +126,15 @@ function Level(props) {
         }
       }}
     >
-      <Maze maze={maze} tileSize={tileSize} flashing={mazeFlashing} />
-      {fruit && <Fruit actorRef={fruit.ref} tileSize={tileSize} />}
-      <Pacman actorRef={pacman.ref} tileSize={tileSize} />
-      {Object.keys(ghosts).map((ghostId) => {
-        if (!ghostId) return null;
-        return (
-          <Ghost
-            actorRef={ghosts[ghostId].ref}
-            tileSize={tileSize}
-            color={ghostColors[ghostId]}
-          />
-        );
+      <Maze
+        levelActor={levelActor}
+        tileSize={tileSize}
+        flashing={mazeFlashing}
+      />
+      {fruitRef && <Fruit actorRef={fruitRef} tileSize={tileSize} />}
+      <Pacman actorRef={pacmanRef} tileSize={tileSize} />
+      {ghostRefs.map((ghostRef) => {
+        return <Ghost actorRef={ghostRef} tileSize={tileSize} />;
       })}
       <text
         className={styles.playerUpText}
@@ -144,14 +145,14 @@ function Level(props) {
       >
         1UP
       </text>
-      <text
+      {/* <text
         x={tileSize * 0 + tileSize / 2}
         y={tileSize * 2 + tileSize / 2}
         stroke="white"
         style={{ fontSize: 8 }}
       >
         {points}
-      </text>
+      </text> */}
       {getReady && (
         <text
           x={tileSize * 12 + tileSize / 2}
@@ -176,7 +177,8 @@ function Level(props) {
         <PacmanIcon x={tileSize * (1 + 1.5 * index)} y={tileSize * 35} />
       ))}
     </svg>
+    // <></>
   );
-}
+});
 
 export default Level;

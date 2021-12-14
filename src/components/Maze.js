@@ -1,6 +1,7 @@
 import React from "react";
 import { getTileComponent } from "./tiles/getTileComponent";
 import styles from "./Maze.module.css";
+import { useSelector } from "@xstate/react";
 
 const getColorForType = (type) => {
   const mapColorToType = {
@@ -20,22 +21,48 @@ const getClassForType = (type, flashing) => {
 
   return mapColorToType[type];
 };
+
+const Tile = React.memo(
+  (props) => {
+    const { i, j, tileSize, flashing, type, display } = props;
+    const TileComponent = getTileComponent(type, display);
+    const color = getColorForType(type);
+    // console.log("TILE RENDER");
+    return (
+      <TileComponent
+        key={`${i}, ${j}`}
+        tileSize={tileSize}
+        position={{ x: j * tileSize, y: i * tileSize }}
+        color={color}
+        className={getClassForType(type, flashing)}
+      />
+    );
+  }
+  // (prev, next) => {
+  //   // console.log(prev, next);
+  //   return true;
+  // }
+);
+
+const selectMaze = (state) => state.context.maze;
 const Maze = React.memo((props) => {
-  const { maze, tileSize, flashing } = props;
+  const { levelActor, tileSize, flashing } = props;
+  const maze = useSelector(levelActor, selectMaze, (a, b) => a === b);
+  if (!maze) {
+    return null;
+  }
   const tiles = [];
 
   maze.tiles.forEach((row, i) => {
     row.forEach((tile, j) => {
-      const TileComponent = getTileComponent(tile.type, tile.display);
-      const color = getColorForType(tile.type);
-
       tiles.push(
-        <TileComponent
+        <Tile
           key={`${i}, ${j}`}
+          i={i}
+          j={j}
+          type={tile.type}
+          display={tile.display}
           tileSize={tileSize}
-          position={{ x: j * tileSize, y: i * tileSize }}
-          color={color}
-          className={getClassForType(tile.type, flashing)}
         />
       );
     });

@@ -11,6 +11,15 @@ import { getTileType } from "../shared/maze";
 import { Howl, Howler } from "howler";
 import CharacterSpeedMachine from "./CharacterSpeedMachine";
 import { getProjectedPosition } from "../util/characterUtil";
+import { tileConstants } from "../shared/maze";
+const {
+  MIN_COL_OFFSET,
+  MAX_COL_OFFSET,
+  MIN_ROW_OFFSET,
+  MAX_ROW_OFFSET,
+  CENTER_COL_OFFSET,
+  CENTER_ROW_OFFSET,
+} = tileConstants;
 
 const { raise, respond, choose } = actions;
 
@@ -18,21 +27,6 @@ const every = (...guards) => ({
   type: "every",
   guards,
 });
-
-const not = (guard) => ({
-  type: "not",
-  guard,
-});
-
-let directions = ["up", "down", "left", "right"];
-
-const MIN_COL_OFFSET = 0;
-const MAX_COL_OFFSET = 7;
-const MIN_ROW_OFFSET = 0;
-const MAX_ROW_OFFSET = 7;
-
-const CENTER_COL_OFFSET = 3;
-const CENTER_ROW_OFFSET = 4;
 
 const getNextPosition = (current, direction, maze) => {
   let projectedPosition = getProjectedPosition(maze, current, direction);
@@ -94,6 +88,14 @@ const getNextPositionWhileCornering = (position, corneringDirections) => {
   };
 };
 
+const START_POSITION = {
+  row: 26,
+  col: 13,
+  rowOffset: 4,
+  colOffset: 7,
+};
+
+const START_DIRECTION = "left";
 const PacmanSpeedMachine = createMachine(
   {
     id: "PacmanSpeed",
@@ -220,10 +222,10 @@ const MovementMachine = createMachine(
         callbackEventName: "TICK",
       },
     },
-    initial: "normalMovement",
+    initial: "straightLine",
     states: {
-      normalMovement: {
-        id: "normalMovement",
+      straightLine: {
+        id: "straightLine",
         initial: "ready",
         states: {
           ready: {
@@ -277,7 +279,7 @@ const MovementMachine = createMachine(
       },
       turning: {
         always: {
-          target: "normalMovement",
+          target: "straightLine",
           actions: ["turn"],
         },
       },
@@ -302,7 +304,7 @@ const MovementMachine = createMachine(
                 target: "ready",
               },
               {
-                target: "#normalMovement",
+                target: "#straightLine",
                 actions: ["completeCorneringTurn"],
               },
             ],
@@ -311,7 +313,7 @@ const MovementMachine = createMachine(
       },
       reversing: {
         always: {
-          target: "normalMovement",
+          target: "straightLine",
           actions: ["reverse"],
         },
       },
@@ -344,7 +346,7 @@ const MovementMachine = createMachine(
                 cond: every("pacmanInCenterOfTile", "pacmanWillHitWall"),
                 target: "#movement.walled",
               },
-              { target: "#normalMovement.ready" },
+              { target: "#straightLine.ready" },
             ],
           },
         },
@@ -552,13 +554,8 @@ const PacmanMachine = createMachine(
   {
     id: "pacman",
     context: {
-      position: {
-        row: 1,
-        col: 1,
-        rowOffset: 4,
-        colOffset: 4,
-      },
-      direction: "left",
+      position: START_POSITION,
+      direction: START_DIRECTION,
       corneringDirections: {},
       requestedDirection: "left",
       nextPosition: {},
@@ -569,6 +566,8 @@ const PacmanMachine = createMachine(
       framesToSkip: 0,
       config: {
         baseSpeed: 80,
+        startPosition: START_POSITION,
+        startDirection: START_DIRECTION,
       },
     },
     type: "parallel",
@@ -664,7 +663,7 @@ const PacmanMachine = createMachine(
             on: {
               RESET_POSITION: {
                 target: "ready",
-                actions: ["setPosition", "setDirection"],
+                actions: ["resetPosition"],
               },
             },
           },
@@ -769,6 +768,10 @@ const PacmanMachine = createMachine(
         { type: "SKIP_FRAMES", framesToSkip: 3 },
         { to: "movement" }
       ),
+      resetPosition: assign({
+        position: (ctx) => ctx.config.startPosition,
+        direction: (ctx) => ctx.config.startDirection,
+      }),
       updatePosition: assign({
         position: (ctx) => {
           return getNextPosition(ctx.position, ctx.direction, ctx.maze, false);
